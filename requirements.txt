@@ -1,0 +1,15 @@
+# Amazon PA-API
+python-amazon-paapi
+
+# Cerebras AI
+cerebras-cloud-sdk
+
+# WordPress REST API
+requests
+
+# Environment variables
+python-dotenv
+
+# HTML parsing & utilities
+beautifulsoup4
+lxml

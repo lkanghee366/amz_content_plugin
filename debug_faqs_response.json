@@ -1,0 +1,69 @@
+=== RAW RESPONSE ===
+[
+  {
+    "question": "How do I choose between a programmable full‑pot coffee maker and a single‑serve pod machine?",
+    "answer": "If you regularly brew multiple cups for a family or guests, a programmable full‑pot model like the Cuisinart 14‑Cup or Ninja 12‑Cup gives you scheduling, larger capacity, and often brew‑strength control. Single‑serve pod machines such as the Keurig K‑Express or K‑Elite excel when you want a quick, mess‑free cup without grinding beans, but they require ongoing pod purchases. Consider your typical serving size, how often you entertain, and whether you prefer the convenience of pods over the flexibility of ground coffee."
+  },
+  {
+    "question": "What are the key differences in brew strength and temperature control among the listed models?",
+    "answer": "Cuisinart and Ninja both provide adjustable brew strength (regular or bold) and temperature settings, allowing you to fine‑tune flavor intensity. Keurig models (K‑Express, K‑Elite, K‑Supreme) offer a “Strong Brew” button and, in some cases, adjustable temperature ranges (187°‑192°F) for hotter cups. The Breville Barista Express focuses on espresso extraction pressure and precise water temperature via PID control, delivering a café‑grade shot rather than a full‑pot brew."
+  },
+  {
+    "question": "Which coffee makers are best for small households versus entertaining guests?",
+    "answer": "For a small household or single‑serve convenience, the Hamilton Beach 2‑Way (12‑cup carafe plus single‑serve) or Keurig K‑Express with its 42 oz reservoir are ideal, offering flexibility without excess capacity. When entertaining, larger carafe models like the Cuisinart 14‑Cup, Ninja 12‑Cup, or Black+Decker 12‑Cup provide enough coffee for a crowd and include features like auto‑pause for early pouring."
+  },
+  {
+    "question": "How important is the carafe material and capacity when comparing these options?",
+    "answer": "Glass carafes, found on Cuisinart, Ninja, and Black+Decker models, let you see the coffee level and avoid plastic taste transfer, but they can be heavier and more fragile. Stainless‑steel or insulated carafes retain heat longer, which is useful if you’ll be away from the machine for a while. Choose a capacity that matches your typical consumption—5 oz cups mean a 12‑cup carafe yields about 60 oz, while a 14‑cup unit provides roughly 70 oz."
+  },
+  {
+    "question": "Are there any hidden costs or accessories I should consider for each type?",
+    "answer": "Pod‑based systems incur ongoing expenses for K‑Cups or compatible pods, and many models (e.g., Keurig) require a water filter replacement every few months. Drip brewers using ground coffee need only beans and occasional paper or reusable filters, which are cheaper over time. The Breville espresso machine includes a grinder and may need regular cleaning tablets and descaling solution to maintain performance."
+  },
+  {
+    "question": "How do the cleaning and maintenance requirements differ between drip brewers and espresso machines?",
+    "answer": "Drip brewers typically have removable brew baskets and simple carafe cleaning; most models like the Black+Decker and Hamilton Beach are dishwasher‑safe. Espresso machines such as the Breville Barista Express require more frequent backflushing, grinder cleaning, and descaling to prevent mineral buildup. Pod machines often have a drip tray and water reservoir that need periodic wiping, but they lack the grinder maintenance of espresso units."
+  },
+  {
+    "question": "Which models offer the most flexibility for both hot and iced coffee drinks?",
+    "answer": "The Ninja Specialty Coffee Maker and Keurig K‑Elite both include dedicated iced‑coffee functions that brew hot over ice for a flavorful chilled drink. The Ninja’s “Hotter Brewing Technology” also ensures strong flavor even when brewing over ice. Keurig’s K‑Supreme adds a strong‑brew button and temperature control, allowing you to fine‑tune the brew before chilling."
+  },
+  {
+    "question": "How does price relate to overall value and feature set across the range?",
+    "answer": "Higher‑priced units like the Breville Barista Express deliver premium espresso capability, integrated grinding, and precise temperature control, offering café‑level results for coffee enthusiasts. Mid‑range models such as Cuisinart, Ninja, and Black+Decker provide solid programmable features, adjustable strength, and larger capacities at a more affordable price. Budget‑friendly options like the Hamilton Beach 2‑Way or basic Keurig single‑serve machines give convenience and basic functionality, but may lack advanced temperature or brew‑strength customization."
+  }
+]
+
+=== EXTRACTED JSON ===
+{
+    "question": "How do I choose between a programmable full‑pot coffee maker and a single‑serve pod machine?",
+    "answer": "If you regularly brew multiple cups for a family or guests, a programmable full‑pot model like the Cuisinart 14‑Cup or Ninja 12‑Cup gives you scheduling, larger capacity, and often brew‑strength control. Single‑serve pod machines such as the Keurig K‑Express or K‑Elite excel when you want a quick, mess‑free cup without grinding beans, but they require ongoing pod purchases. Consider your typical serving size, how often you entertain, and whether you prefer the convenience of pods over the flexibility of ground coffee."
+  },
+  {
+    "question": "What are the key differences in brew strength and temperature control among the listed models?",
+    "answer": "Cuisinart and Ninja both provide adjustable brew strength (regular or bold) and temperature settings, allowing you to fine‑tune flavor intensity. Keurig models (K‑Express, K‑Elite, K‑Supreme) offer a “Strong Brew” button and, in some cases, adjustable temperature ranges (187°‑192°F) for hotter cups. The Breville Barista Express focuses on espresso extraction pressure and precise water temperature via PID control, delivering a café‑grade shot rather than a full‑pot brew."
+  },
+  {
+    "question": "Which coffee makers are best for small households versus entertaining guests?",
+    "answer": "For a small household or single‑serve convenience, the Hamilton Beach 2‑Way (12‑cup carafe plus single‑serve) or Keurig K‑Express with its 42 oz reservoir are ideal, offering flexibility without excess capacity. When entertaining, larger carafe models like the Cuisinart 14‑Cup, Ninja 12‑Cup, or Black+Decker 12‑Cup provide enough coffee for a crowd and include features like auto‑pause for early pouring."
+  },
+  {
+    "question": "How important is the carafe material and capacity when comparing these options?",
+    "answer": "Glass carafes, found on Cuisinart, Ninja, and Black+Decker models, let you see the coffee level and avoid plastic taste transfer, but they can be heavier and more fragile. Stainless‑steel or insulated carafes retain heat longer, which is useful if you’ll be away from the machine for a while. Choose a capacity that matches your typical consumption—5 oz cups mean a 12‑cup carafe yields about 60 oz, while a 14‑cup unit provides roughly 70 oz."
+  },
+  {
+    "question": "Are there any hidden costs or accessories I should consider for each type?",
+    "answer": "Pod‑based systems incur ongoing expenses for K‑Cups or compatible pods, and many models (e.g., Keurig) require a water filter replacement every few months. Drip brewers using ground coffee need only beans and occasional paper or reusable filters, which are cheaper over time. The Breville espresso machine includes a grinder and may need regular cleaning tablets and descaling solution to maintain performance."
+  },
+  {
+    "question": "How do the cleaning and maintenance requirements differ between drip brewers and espresso machines?",
+    "answer": "Drip brewers typically have removable brew baskets and simple carafe cleaning; most models like the Black+Decker and Hamilton Beach are dishwasher‑safe. Espresso machines such as the Breville Barista Express require more frequent backflushing, grinder cleaning, and descaling to prevent mineral buildup. Pod machines often have a drip tray and water reservoir that need periodic wiping, but they lack the grinder maintenance of espresso units."
+  },
+  {
+    "question": "Which models offer the most flexibility for both hot and iced coffee drinks?",
+    "answer": "The Ninja Specialty Coffee Maker and Keurig K‑Elite both include dedicated iced‑coffee functions that brew hot over ice for a flavorful chilled drink. The Ninja’s “Hotter Brewing Technology” also ensures strong flavor even when brewing over ice. Keurig’s K‑Supreme adds a strong‑brew button and temperature control, allowing you to fine‑tune the brew before chilling."
+  },
+  {
+    "question": "How does price relate to overall value and feature set across the range?",
+    "answer": "Higher‑priced units like the Breville Barista Express deliver premium espresso capability, integrated grinding, and precise temperature control, offering café‑level results for coffee enthusiasts. Mid‑range models such as Cuisinart, Ninja, and Black+Decker provide solid programmable features, adjustable strength, and larger capacities at a more affordable price. Budget‑friendly options like the Hamilton Beach 2‑Way or basic Keurig single‑serve machines give convenience and basic functionality, but may lack advanced temperature or brew‑strength customization."
+  }

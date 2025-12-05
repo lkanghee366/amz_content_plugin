@@ -1,0 +1,59 @@
+{
+  "sites": [
+    {
+      "id": 1,
+      "name": "ProGardenReview",
+      "site_url": "https://progardenreview.com",
+      "username": "alex",
+      "app_password": "4o7v jSjz WmAL k46P eVvX dLVG",
+      "author_id": 2,
+      "category_id": 10,
+      "status": "publish",
+      "keyword_file": "keywords/pots_soil_fertilizer.txt"
+    },
+    {
+      "id": 2,
+      "name": "ProKitchenReview",
+      "site_url": "https://prokitchenreview.com",
+      "username": "admin",
+      "app_password": "5A03 TYh3 3BdE mKV9 pvWw zPc8",
+      "author_id": 1,
+      "category_id": 16,
+      "status": "publish",
+      "keyword_file": "keywords/roaster_oven.txt"
+    },
+    {
+      "id": 3,
+      "name": "MountainTidesWine",
+      "site_url": "https://www.mountaintideswine.com",
+      "username": "admin",
+      "app_password": "IFJ5 sDd8 AFQe Z9cq BGmi 84bD",
+      "author_id": 1,
+      "category_id": 26,
+      "status": "publish",
+      "keyword_file": "keywords/kitchenware_filtered.txt"
+    },
+    {
+      "id": 4,
+      "name": "AirFryerRadar",
+      "site_url": "https://airfryerradar.com",
+      "username": "admin",
+      "app_password": "Dt8d EHif BKlg KNiB xrbx brbI",
+      "author_id": 1,
+      "category_id": 20,
+      "status": "publish",
+      "keyword_file": "keywords/roaster_oven.txt"
+    },
+    {
+      "id": 5,
+      "name": "LumbermensHomes",
+      "site_url": "https://www.lumbermenshomes.com",
+      "username": "admin",
+      "app_password": "uox0 u3pe BAND 9aDq OSy1 eubR",
+      "author_id": 1,
+      "category_id": 11,
+      "status": "publish",
+      "keyword_file": "keywords/survival_tools.txt"
+    }
+  ]
+}

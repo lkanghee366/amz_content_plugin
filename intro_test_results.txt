@@ -1,0 +1,125 @@
+======================================================================
+INTRO GENERATION TEST - 10 RUNS
+Keyword: best coffee maker
+======================================================================
+
+======================================================================
+RUN #1
+======================================================================
+Status: SUCCESS
+Word Count: 45
+Length: 299 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Must start with a hook (question, scenario, or vivid detail). Conversational and trustworthy. Output only the final paragraph, no extra text. You're not alone. I’ve tested dozens of models, from compact single‑serve units to robust French‑press hybrids, and distilled the results into a clear guide.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #2
+======================================================================
+Status: SUCCESS
+Word Count: 45
+Length: 285 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Must start with a hook: question, scenario, or vivid detail. Conversational, trustworthy. Must be exactly 75 words. You’re not alone. That’s why we’ve brewed a side‑by‑side comparison of the top performers, testing flavor, ease of use, durability, and price. 19 You’re 20 not 21 alone.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #3
+======================================================================
+Status: SUCCESS
+Word Count: 73
+Length: 463 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever dreamed of waking up to the perfect espresso aroma swirling through your kitchen? Whether you’re a busy professional, a weekend brunch host, or just craving that flawless drip, choosing the right coffee maker can feel overwhelming. I’ve tested dozens, from sleek single-serve gadgets to robust French presses, and I’m here to share honest, no‑fluff insights. Let’s cut through the hype and find the brew companion that fits your taste, budget, and lifestyle.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #4
+======================================================================
+Status: SUCCESS
+Word Count: 64
+Length: 391 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Must start with a hook (question, scenario, or vivid detail). Conversational and trustworthy. Must be exactly 75 words? It says "Write a 75-word engaging introduction". Likely exactly 75 words. Start with hook: "Ever wake up to the sound of your alarm, stare at a silent kitchen, and wish that perfect cup of coffee could magically appear?" That's a question. Now continue. You're not alone.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #5
+======================================================================
+Status: SUCCESS
+Word Count: 73
+Length: 411 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever woken up to the bitter sting of a sub‑par brew and wished you could just press a button and get café‑level coffee at home? You’re not alone. With a flood of gadgets promising the perfect cup, choosing the right coffee maker feels like navigating a maze. In this guide, we’ve tested, tasted, and tallied the top contenders so you can skip the guesswork and start sipping the smooth, rich coffee you deserve.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #6
+======================================================================
+Status: SUCCESS
+Word Count: 69
+Length: 400 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever wake up to the sound of a silent kitchen, wondering why your coffee never tastes like the one from your favorite café? Imagine brewing a rich, barista‑level cup with just the press of a button, without breaking the bank. In this guide we’ll walk through the top coffee makers, weighing performance, price, and ease of use, so you can confidently pick the perfect machine for your morning ritual.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #7
+======================================================================
+Status: SUCCESS
+Word Count: 72
+Length: 415 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever wake up to the smell of stale coffee and wonder if there’s a machine that can turn that groggy morning into a café‑quality ritual? I’ve tested dozens of brewers, from single‑serve marvels to classic drip dynamos, and I’m here to share the winners. In this guide we’ll break down performance, flavor, price, and ease of use so you can pick the perfect coffee maker that fits your lifestyle—no fluff, just facts.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #8
+======================================================================
+Status: SUCCESS
+Word Count: 72
+Length: 432 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever wondered how the perfect cup of coffee could transform your morning routine? Imagine waking up to the rich aroma of a barista‑level brew without leaving home. In this guide, we’ve handpicked the top coffee makers, tested them against real‑world criteria, and broken down the pros and cons so you can choose the machine that fits your taste, budget, and lifestyle. Trust our thorough research to help you sip smarter, every day.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #9
+======================================================================
+Status: SUCCESS
+Word Count: 68
+Length: 426 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever woken up to a bland, lukewarm cup and thought, “There’s got to be a better way?” If you’ve ever dreamed of barista‑quality brew without leaving the kitchen, you’re not alone. I’ve tested dozens of machines, from sleek single‑serve champs to robust drip workhorses, and distilled the results into an honest, no‑fluff guide. Ready to discover which coffee maker truly delivers flavor, convenience, and value? Let’s dive in.
+----------------------------------------------------------------------
+
+======================================================================
+RUN #10
+======================================================================
+Status: SUCCESS
+Word Count: 73
+Length: 413 characters
+
+Intro Text:
+----------------------------------------------------------------------
+Ever wake up to the smell of stale coffee and wonder if there’s a better way to start your day? Imagine pressing a single button and watching rich, aromatic brew fill your cup, just the way a barista would craft it at home. In this guide, we’ve tested, brewed, and compared the top coffee makers on the market, highlighting performance, price, and features so you can choose the perfect machine for your mornings.
+----------------------------------------------------------------------
+
