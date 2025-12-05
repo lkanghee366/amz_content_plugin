@@ -1,20 +1,20 @@
 """
-AI Content Generator using Cerebras API
+AI Content Generator using Unified AI Client
 Generates: Intro, Badges, Editor's Choice, Buying Guide, FAQs
 """
 import json
 import re
 import logging
-from cerebras_client import CerebrasClient
+from unified_ai_client import UnifiedAIClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class AIContentGenerator:
-    """Generate article content using Cerebras AI"""
+    """Generate article content using Unified AI Client (ChatZai + Cerebras fallback)"""
     
-    def __init__(self, cerebras_client: CerebrasClient):
-        """Initialize with Cerebras client"""
-        self.client = cerebras_client
+    def __init__(self, ai_client: UnifiedAIClient):
+        """Initialize with Unified AI client"""
+        self.client = ai_client
     
     def _extract_json(self, text: str) -> str:
         """Extract JSON from AI response (handles markdown code blocks)"""

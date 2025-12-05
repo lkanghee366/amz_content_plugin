@@ -11,6 +11,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from cerebras_client import CerebrasClient
+from chat_zai_client import ChatZaiClient
+from unified_ai_client import UnifiedAIClient
 from amazon_api import AmazonProductAPI
 from ai_generator import AIContentGenerator
 from html_builder import HTMLBuilder
@@ -44,9 +46,24 @@ class AmazonWPPoster:
         self._validate_config()
         
         # Initialize components
+        # Initialize ChatZai client (primary)
+        chat_zai_url = os.getenv('CHAT_ZAI_API_URL', 'http://localhost:3001')
+        self.chat_zai = ChatZaiClient(
+            api_url=chat_zai_url,
+            timeout=60,
+            max_retries=3
+        )
+        
+        # Initialize Cerebras client (fallback)
         self.cerebras = CerebrasClient(
             api_keys_file=os.getenv('CEREBRAS_KEYS_FILE', 'cerebras_api_keys.txt'),
             model=os.getenv('CEREBRAS_MODEL', 'gpt-oss-120b')
+        )
+        
+        # Create unified AI client
+        self.ai_client = UnifiedAIClient(
+            chat_zai_client=self.chat_zai,
+            cerebras_client=self.cerebras
         )
         
         self.amazon = AmazonProductAPI(
@@ -56,7 +73,7 @@ class AmazonWPPoster:
             region=os.getenv('AMAZON_REGION', 'us-east-1')
         )
         
-        self.ai_generator = AIContentGenerator(self.cerebras)
+        self.ai_generator = AIContentGenerator(self.ai_client)
         
         # Initialize WordPress with site config
         self.wordpress = WordPressAPI(
@@ -254,6 +271,16 @@ class AmazonWPPoster:
                 logging.info(f"   - {r['keyword']}: {r.get('error', 'Unknown error')}")
         
         logging.info(f"\n{'='*60}\n")
+        
+        # Print AI provider statistics
+        if hasattr(self, 'ai_client'):
+            self.ai_client.print_stats()
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        if hasattr(self, 'ai_client'):
+            self.ai_client.close()
+        logging.info("✅ Cleanup complete")
 
 def main():
     """Main entry point"""
@@ -296,7 +323,12 @@ def main():
         sys.exit(1)
     
     logging.info(f"📄 Using keyword file: {keywords_file}")
-    app.process_keywords_file(keywords_file)
+    
+    try:
+        app.process_keywords_file(keywords_file)
+    finally:
+        # Cleanup resources
+        app.cleanup()
 
 if __name__ == '__main__':
     main()
