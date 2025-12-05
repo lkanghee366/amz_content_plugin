@@ -80,9 +80,13 @@ class ChatZaiClient:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    # Handle both 'response' and 'answer' fields
                     if 'response' in data:
                         logger.info(f"ChatZai generated {len(data['response'])} characters")
                         return data['response']
+                    elif 'answer' in data:
+                        logger.info(f"ChatZai generated {len(data['answer'])} characters")
+                        return data['answer']
                     else:
                         raise Exception(f"Invalid response format: {data}")
                 else:

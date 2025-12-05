@@ -84,9 +84,13 @@ class UnifiedAIClient:
         # Fallback to Cerebras
         try:
             logger.info("🧠 Using Cerebras (fallback provider)")
+            # Cerebras doesn't support system_prompt parameter, merge it with prompt
+            full_prompt = prompt
+            if system_prompt:
+                full_prompt = f"{system_prompt}\n\n{prompt}"
+            
             response = self.cerebras.generate(
-                prompt=prompt,
-                system_prompt=system_prompt,
+                prompt=full_prompt,
                 max_tokens=max_tokens,
                 temperature=temperature
             )
