@@ -93,9 +93,9 @@ class UnifiedAIClient:
                 logger.info("🔄 Rotating context after successful request...")
                 self.chat_zai.rotate_context()
                 
-                # Rate limiting: wait 7 seconds before next request
-                logger.info("⏳ Waiting 7 seconds before next request...")
-                time.sleep(7)
+                # Rate limiting: wait 3 seconds before next request
+                logger.info("⏳ Waiting 3 seconds before next request...")
+                time.sleep(3)
                 
                 return response
                 
@@ -127,9 +127,9 @@ class UnifiedAIClient:
             self.stats['cerebras_success'] += 1
             logger.info("✓ Cerebras generation successful")
             
-            # Rate limiting: wait 7 seconds before next request (no rotation for Cerebras)
-            logger.info("⏳ Waiting 7 seconds before next request...")
-            time.sleep(7)
+            # Rate limiting: wait 3 seconds before next request (no rotation for Cerebras)
+            logger.info("⏳ Waiting 3 seconds before next request...")
+            time.sleep(3)
             
             # Try to restore ChatZai health for next request
             self.chat_zai_healthy = self.chat_zai.health_check()
