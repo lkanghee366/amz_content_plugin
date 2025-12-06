@@ -37,6 +37,9 @@ class UnifiedAIClient:
         self.chat_zai_healthy = self.chat_zai.health_check()
         if self.chat_zai_healthy:
             logger.info("✓ ChatZai API is healthy and ready")
+            # Rotate context on startup for fresh start
+            logger.info("🔄 Rotating context on startup for fresh session...")
+            self.chat_zai.rotate_context()
         else:
             logger.warning("✗ ChatZai API is not responding, will use Cerebras fallback")
     
