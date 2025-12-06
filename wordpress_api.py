@@ -38,7 +38,7 @@ class WordPressAPI:
     def test_connection(self) -> bool:
         """Test API connection and authentication"""
         try:
-            response = self.session.get(f"{self.api_base}/users/me")
+            response = self.session.get(f"{self.api_base}/users/me", timeout=30)
             if response.status_code == 200:
                 user = response.json()
                 logging.info(f"✅ Connected as: {user.get('name', 'Unknown')}")
@@ -46,6 +46,12 @@ class WordPressAPI:
             else:
                 logging.error(f"❌ Auth failed: {response.status_code} - {response.text}")
                 return False
+        except requests.exceptions.Timeout:
+            logging.error(f"❌ Connection test timeout (30s)")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"❌ Connection error: {e}")
+            return False
         except Exception as e:
             logging.error(f"❌ Connection test failed: {e}")
             return False

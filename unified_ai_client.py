@@ -2,6 +2,7 @@
 Unified AI Client - Manages multiple AI providers with smart fallback
 """
 import logging
+import time
 from typing import Optional
 from chat_zai_client import ChatZaiClient
 from cerebras_client import CerebrasClient
@@ -40,7 +41,9 @@ class UnifiedAIClient:
             logger.warning("✗ ChatZai API is not responding, will use Cerebras fallback")
     
     def generate(self, prompt: str, system_prompt: Optional[str] = None,
-                 max_tokens: int = 4000, temperature: float = 0.7) -> str:
+                 max_tokens: int = 4000, temperature: float = 0.7, 
+                 stream: bool = False, use_reasoning: bool = True, 
+                 model_override: Optional[str] = None) -> str:
         """
         Generate text using primary provider with automatic fallback
         
@@ -49,6 +52,9 @@ class UnifiedAIClient:
             system_prompt: Optional system prompt
             max_tokens: Maximum tokens to generate
             temperature: Temperature for generation (0.0-1.0)
+            stream: Enable streaming (only for Cerebras)
+            use_reasoning: Add reasoning effort (only for Cerebras)
+            model_override: Override model (only for Cerebras)
             
         Returns:
             str: Generated text
@@ -68,8 +74,29 @@ class UnifiedAIClient:
                     max_tokens=max_tokens,
                     temperature=temperature
                 )
+                
+                # Check if JSON response is complete
+                response_stripped = response.strip()
+                if response_stripped.startswith('{') or response_stripped.startswith('['):
+                    # It's JSON, validate completeness
+                    if response_stripped.startswith('{') and not response_stripped.endswith('}'):
+                        logger.warning("⚠️ ChatZai returned incomplete JSON (missing closing brace)")
+                        raise Exception("Incomplete JSON response from ChatZai")
+                    elif response_stripped.startswith('[') and not response_stripped.endswith(']'):
+                        logger.warning("⚠️ ChatZai returned incomplete JSON (missing closing bracket)")
+                        raise Exception("Incomplete JSON response from ChatZai")
+                
                 self.stats['chat_zai_success'] += 1
                 logger.info("✓ ChatZai generation successful")
+                
+                # Rotate context after successful response
+                logger.info("🔄 Rotating context after successful request...")
+                self.chat_zai.rotate_context()
+                
+                # Rate limiting: wait 7 seconds before next request
+                logger.info("⏳ Waiting 7 seconds before next request...")
+                time.sleep(7)
+                
                 return response
                 
             except Exception as e:
@@ -92,10 +119,17 @@ class UnifiedAIClient:
             response = self.cerebras.generate(
                 prompt=full_prompt,
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                stream=stream,
+                use_reasoning=use_reasoning,
+                model_override=model_override
             )
             self.stats['cerebras_success'] += 1
             logger.info("✓ Cerebras generation successful")
+            
+            # Rate limiting: wait 7 seconds before next request (no rotation for Cerebras)
+            logger.info("⏳ Waiting 7 seconds before next request...")
+            time.sleep(7)
             
             # Try to restore ChatZai health for next request
             self.chat_zai_healthy = self.chat_zai.health_check()

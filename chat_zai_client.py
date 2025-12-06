@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 class ChatZaiClient:
     """Client for chat.z.ai API running on Node.js server"""
     
-    def __init__(self, api_url: str = "http://localhost:3001", timeout: int = 60, max_retries: int = 3):
+    def __init__(self, api_url: str = "http://localhost:3001", timeout: int = 120, max_retries: int = 3):
         """
         Initialize ChatZai client
         
         Args:
             api_url: Base URL of the chat.z.ai API server
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (default 120 for long responses)
             max_retries: Maximum number of retry attempts
         """
         self.api_url = api_url.rstrip('/')
@@ -41,6 +41,30 @@ class ChatZaiClient:
             return response.status_code == 200
         except Exception as e:
             logger.warning(f"ChatZai health check failed: {e}")
+            return False
+    
+    def rotate_context(self) -> bool:
+        """
+        Force rotate context to start fresh conversation
+        
+        Returns:
+            bool: True if rotation successful, False otherwise
+        """
+        try:
+            response = self.session.post(
+                f"{self.api_url}/rotate",
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info("✓ Context rotated")
+                return True
+            else:
+                logger.warning(f"⚠️ Context rotation failed: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Context rotation error: {e}")
             return False
     
     def generate(self, prompt: str, system_prompt: Optional[str] = None, 
@@ -82,11 +106,19 @@ class ChatZaiClient:
                     data = response.json()
                     # Handle both 'response' and 'answer' fields
                     if 'response' in data:
-                        logger.info(f"ChatZai generated {len(data['response'])} characters")
-                        return data['response']
+                        result = data['response']
+                        logger.info(f"ChatZai generated {len(result)} characters")
+                        # Check if response looks incomplete (for JSON)
+                        if result.strip().startswith('{') and not result.strip().endswith('}'):
+                            logger.warning(f"⚠️ Response may be incomplete (missing closing brace)")
+                        return result
                     elif 'answer' in data:
-                        logger.info(f"ChatZai generated {len(data['answer'])} characters")
-                        return data['answer']
+                        result = data['answer']
+                        logger.info(f"ChatZai generated {len(result)} characters")
+                        # Check if response looks incomplete (for JSON)
+                        if result.strip().startswith('{') and not result.strip().endswith('}'):
+                            logger.warning(f"⚠️ Response may be incomplete (missing closing brace)")
+                        return result
                     else:
                         raise Exception(f"Invalid response format: {data}")
                 else:
@@ -104,9 +136,9 @@ class ChatZaiClient:
                 last_error = f"Generation error: {e}"
                 logger.warning(f"{last_error} (attempt {attempt + 1}/{self.max_retries})")
             
-            # Wait before retry (exponential backoff)
+            # Wait before retry (fixed 10 second delay)
             if attempt < self.max_retries - 1:
-                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                wait_time = 10  # 10s between retries
                 logger.info(f"Waiting {wait_time}s before retry...")
                 time.sleep(wait_time)
         

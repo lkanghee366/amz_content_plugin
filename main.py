@@ -50,7 +50,7 @@ class AmazonWPPoster:
         chat_zai_url = os.getenv('CHAT_ZAI_API_URL', 'http://localhost:3001')
         self.chat_zai = ChatZaiClient(
             api_url=chat_zai_url,
-            timeout=60,
+            timeout=120,  # Increased timeout for long JSON responses
             max_retries=3
         )
         
