@@ -46,24 +46,21 @@ class ChatZaiClient:
     def rotate_context(self) -> bool:
         """
         Force rotate context to start fresh conversation
-        Waits for rotation response before returning
         
         Returns:
             bool: True if rotation successful, False otherwise
         """
         try:
-            logger.debug("Sending POST /rotate request...")
             response = self.session.post(
                 f"{self.api_url}/rotate",
                 timeout=10
             )
             
             if response.status_code == 200:
-                logger.debug(f"Rotation response: {response.text[:100] if response.text else 'OK'}")
-                logger.info("✓ Context rotated successfully")
+                logger.info("✓ Context rotated")
                 return True
             else:
-                logger.warning(f"⚠️ Context rotation failed: HTTP {response.status_code}")
+                logger.warning(f"⚠️ Context rotation failed: {response.status_code}")
                 return False
                 
         except Exception as e:

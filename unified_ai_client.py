@@ -94,12 +94,7 @@ class UnifiedAIClient:
                 
                 # Rotate context after successful response
                 logger.info("🔄 Rotating context after successful request...")
-                rotate_success = self.chat_zai.rotate_context()
-                
-                if rotate_success:
-                    logger.info("✓ Rotation complete, context is fresh")
-                else:
-                    logger.warning("⚠️ Rotation failed, continuing anyway")
+                self.chat_zai.rotate_context()
                 
                 # Rate limiting: wait 3 seconds before next request
                 logger.info("⏳ Waiting 3 seconds before next request...")
