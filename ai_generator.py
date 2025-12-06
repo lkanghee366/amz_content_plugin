@@ -277,8 +277,7 @@ class AIContentGenerator:
             '"sections": [{"heading": "Capacity & Size", "bullets": ["Consider your family size", "Check counter space"]}, '
             '{"heading": "Performance", "bullets": ["Look for higher wattage", "Check temperature range"]}]}\n\n'
             "Create 4-6 sections with 3-5 bullets each. No emojis, no prices.\n"
-            f"Context: {keyword}\n"
-            f"Products: {json.dumps(compact, ensure_ascii=False)}"
+            f"Context: {keyword}"
         )
         
         try:
@@ -348,8 +347,7 @@ class AIContentGenerator:
             '[{"question": "What should I look for?", "answer": "Consider capacity, features..."}, '
             '{"question": "How do they compare?", "answer": "Main differences are..."}]\n\n'
             "Each answer should be 2-4 sentences. Cover buying tips, comparisons, features, value.\n"
-            f"Context: {keyword}\n"
-            f"Products: {json.dumps(compact, ensure_ascii=False)}"
+            f"Context: {keyword}"
         )
         
         try:
