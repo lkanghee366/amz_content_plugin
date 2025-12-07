@@ -37,9 +37,6 @@ class UnifiedAIClient:
         self.chat_zai_healthy = self.chat_zai.health_check()
         if self.chat_zai_healthy:
             logger.info("✓ ChatZai API is healthy and ready")
-            # Rotate context on startup for fresh start
-            logger.info("🔄 Rotating context on startup for fresh session...")
-            self.chat_zai.rotate_context()
         else:
             logger.warning("✗ ChatZai API is not responding, will use Cerebras fallback")
     
@@ -92,14 +89,6 @@ class UnifiedAIClient:
                 self.stats['chat_zai_success'] += 1
                 logger.info("✓ ChatZai generation successful")
                 
-                # Rotate context after successful response
-                logger.info("🔄 Rotating context after successful request...")
-                self.chat_zai.rotate_context()
-                
-                # Rate limiting: wait 3 seconds before next request
-                logger.info("⏳ Waiting 3 seconds before next request...")
-                time.sleep(3)
-                
                 return response
                 
             except Exception as e:
@@ -129,10 +118,6 @@ class UnifiedAIClient:
             )
             self.stats['cerebras_success'] += 1
             logger.info("✓ Cerebras generation successful")
-            
-            # Rate limiting: wait 3 seconds before next request (no rotation for Cerebras)
-            logger.info("⏳ Waiting 3 seconds before next request...")
-            time.sleep(3)
             
             # Try to restore ChatZai health for next request
             self.chat_zai_healthy = self.chat_zai.health_check()

@@ -43,30 +43,6 @@ class ChatZaiClient:
             logger.warning(f"ChatZai health check failed: {e}")
             return False
     
-    def rotate_context(self) -> bool:
-        """
-        Force rotate context to start fresh conversation
-        
-        Returns:
-            bool: True if rotation successful, False otherwise
-        """
-        try:
-            response = self.session.post(
-                f"{self.api_url}/rotate",
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                logger.info("✓ Context rotated")
-                return True
-            else:
-                logger.warning(f"⚠️ Context rotation failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Context rotation error: {e}")
-            return False
-    
     def generate(self, prompt: str, system_prompt: Optional[str] = None, 
                  max_tokens: int = 4000, temperature: float = 0.7) -> str:
         """
@@ -84,11 +60,14 @@ class ChatZaiClient:
         Raises:
             Exception: If generation fails after all retries
         """
+        # Merge system prompt with user prompt if provided
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+        
+        # ChatZai API only accepts 'prompt' field
         payload = {
-            "prompt": prompt,
-            "systemPrompt": system_prompt,
-            "maxTokens": max_tokens,
-            "temperature": temperature
+            "prompt": full_prompt
         }
         
         last_error = None

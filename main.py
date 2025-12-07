@@ -216,7 +216,7 @@ class AmazonWPPoster:
             return
         
         logging.info(f"\n📋 Found {len(keywords)} keyword(s) to process")
-        logging.info(f"⏱️ Estimated time: ~{len(keywords) * (self.post_delay + 30) / 60:.1f} minutes")
+        logging.info(f"⏱️ Estimated time: ~{len(keywords) * 25 / 60:.1f} minutes (no delays between posts)")
         
         # Test WordPress connection
         if not self.wordpress.test_connection():
@@ -243,11 +243,6 @@ class AmazonWPPoster:
                     logging.info(f"✂️ Removed '{keyword}' from {filepath}")
                 except Exception as e:
                     logging.warning(f"⚠️ Failed to remove keyword from file: {e}")
-            
-            # Delay between posts (except for last one)
-            if idx < len(keywords):
-                logging.info(f"⏳ Waiting {self.post_delay} seconds before next post...")
-                time.sleep(self.post_delay)
         
         # Summary
         logging.info(f"\n{'='*60}")
