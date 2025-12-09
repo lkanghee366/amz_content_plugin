@@ -226,6 +226,7 @@ class AmazonWPPoster:
         # Process each keyword
         results = []
         remaining_keywords = keywords.copy()
+        consecutive_failures = 0
         
         for idx, keyword in enumerate(keywords, 1):
             logging.info(f"\n📊 Progress: {idx}/{len(keywords)}")
@@ -235,6 +236,7 @@ class AmazonWPPoster:
             
             # Remove keyword from file if successfully posted
             if result['success']:
+                consecutive_failures = 0  # Reset failure counter on success
                 try:
                     remaining_keywords.remove(keyword)
                     with open(filepath, 'w', encoding='utf-8') as f:
@@ -243,6 +245,19 @@ class AmazonWPPoster:
                     logging.info(f"✂️ Removed '{keyword}' from {filepath}")
                 except Exception as e:
                     logging.warning(f"⚠️ Failed to remove keyword from file: {e}")
+            else:
+                # Increment failure counter
+                consecutive_failures += 1
+                logging.warning(f"⚠️ Consecutive failures: {consecutive_failures}/2")
+                
+                # Stop if 2 consecutive failures
+                if consecutive_failures >= 2:
+                    logging.error("\n" + "="*60)
+                    logging.error("🛑 STOPPING: 2 consecutive failures detected!")
+                    logging.error("Reason: Preventing waste of Amazon API calls")
+                    logging.error("Action: Please check logs and fix issues before resuming")
+                    logging.error("="*60 + "\n")
+                    break
         
         # Summary
         logging.info(f"\n{'='*60}")
