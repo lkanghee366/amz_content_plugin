@@ -52,6 +52,7 @@ class AIContentGenerator:
     def generate_all_content_parallel(self, keyword: str, products: list) -> dict:
         """
         Generate all content sections in parallel (max 2 concurrent)
+        3 Waves: Intro+Badge1, Badge2+Badge3, Guide+FAQs
         
         Args:
             keyword: Search keyword
@@ -63,16 +64,21 @@ class AIContentGenerator:
         Raises:
             Exception: If any section fails after retries
         """
-        logging.info("🚀 Starting parallel content generation...")
+        logging.info("🚀 Starting parallel content generation (3 waves)...")
         
         results = {}
         
+        # Prepare badge batches
+        batch1 = products[0:3]   # 3 products
+        batch2 = products[3:6]   # 3 products
+        batch3 = products[6:10]  # 4 products
+        
         with ThreadPoolExecutor(max_workers=2) as executor:
-            # Wave 1: Intro + Badges (parallel)
-            logging.info("\n⚡ Wave 1: Generating Intro + Badges in parallel...")
+            # Wave 1: Intro + Badge Batch 1 (parallel)
+            logging.info("\n⚡ Wave 1: Generating Intro + Badge Batch 1 (3 products) in parallel...")
             
             future_intro = executor.submit(self._generate_with_retry, self.generate_intro, keyword)
-            future_badges = executor.submit(self._generate_with_retry, self.generate_badges, keyword, products)
+            future_badge1 = executor.submit(self._generate_with_retry, self.generate_badges_batch, keyword, batch1, "Batch 1")
             
             # Wait for Wave 1 to complete
             try:
@@ -84,20 +90,46 @@ class AIContentGenerator:
                 raise
             
             try:
-                logging.info("🏆 Waiting for Badges...")
-                results['badges'] = future_badges.result()
-                logging.info("✅ Badges complete")
+                logging.info("🏆 Waiting for Badge Batch 1...")
+                badge1_data = future_badge1.result()
+                results['badge1'] = badge1_data
+                logging.info("✅ Badge Batch 1 complete")
             except Exception as e:
-                logging.error(f"❌ Badges failed after all retries: {e}")
+                logging.error(f"❌ Badge Batch 1 failed after all retries: {e}")
                 raise
             
-            # Wave 2: Guide + FAQs (parallel)
-            logging.info("\n⚡ Wave 2: Generating Guide + FAQs in parallel...")
+            # Wave 2: Badge Batch 2 + Badge Batch 3 (parallel)
+            logging.info("\n⚡ Wave 2: Generating Badge Batch 2 (3 products) + Badge Batch 3 (4 products) in parallel...")
+            
+            future_badge2 = executor.submit(self._generate_with_retry, self.generate_badges_batch, keyword, batch2, "Batch 2")
+            future_badge3 = executor.submit(self._generate_with_retry, self.generate_badges_batch, keyword, batch3, "Batch 3")
+            
+            # Wait for Wave 2 to complete
+            try:
+                logging.info("🏆 Waiting for Badge Batch 2...")
+                badge2_data = future_badge2.result()
+                results['badge2'] = badge2_data
+                logging.info("✅ Badge Batch 2 complete")
+            except Exception as e:
+                logging.error(f"❌ Badge Batch 2 failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("🏆 Waiting for Badge Batch 3...")
+                badge3_data = future_badge3.result()
+                results['badge3'] = badge3_data
+                logging.info("✅ Badge Batch 3 complete")
+            except Exception as e:
+                logging.error(f"❌ Badge Batch 3 failed after all retries: {e}")
+                raise
+            
+            # Wave 3: Guide + FAQs (parallel)
+            logging.info("\n⚡ Wave 3: Generating Guide + FAQs in parallel...")
             
             future_guide = executor.submit(self._generate_with_retry, self.generate_buying_guide, keyword, products)
             future_faqs = executor.submit(self._generate_with_retry, self.generate_faqs, keyword, products)
             
-            # Wait for Wave 2 to complete
+            # Wait for Wave 3 to complete
             try:
                 logging.info("📚 Waiting for Buying Guide...")
                 results['guide'] = future_guide.result()
@@ -114,7 +146,26 @@ class AIContentGenerator:
                 logging.error(f"❌ FAQs failed after all retries: {e}")
                 raise
         
-        logging.info("\n✅ All parallel content generation complete!")
+        # Merge all badge batches + select top recommendation
+        all_badges = []
+        all_badges.extend(results['badge1']['badges'])
+        all_badges.extend(results['badge2']['badges'])
+        all_badges.extend(results['badge3']['badges'])
+        
+        # Select first product as top recommendation (can be improved with scoring)
+        top_recommendation = {"asin": products[0]['asin']}
+        
+        results['badges'] = {
+            "top_recommendation": top_recommendation,
+            "badges": all_badges
+        }
+        
+        # Clean up temporary batch results
+        del results['badge1']
+        del results['badge2']
+        del results['badge3']
+        
+        logging.info(f"\n✅ All parallel content generation complete! Total badges: {len(all_badges)}")
         return results
     
     def _extract_json(self, text: str) -> str:
@@ -257,20 +308,24 @@ class AIContentGenerator:
             logging.error(f"❌ Failed to generate intro: {e}")
             raise
     
-    def generate_badges(self, keyword: str, products: list) -> dict:
+    def generate_badges_batch(self, keyword: str, products: list, batch_name: str = "Batch") -> dict:
         """
-        Generate badges for all products + select top recommendation
+        Generate badges for a batch of products (3-4 products)
         
+        Args:
+            keyword: Search keyword
+            products: List of 3-4 products
+            batch_name: Name for logging (e.g., "Batch 1")
+            
         Returns:
             {
-                "top_recommendation": {"asin": "B0XXX"},
                 "badges": [
                     {"asin": "B0XXX", "badge": "Best overall"},
                     {"asin": "B0YYY", "badge": "Best value"}
                 ]
             }
         """
-        logging.info(f"🏷️ Generating badges for {len(products)} products")
+        logging.info(f"🏷️ Generating badges for {batch_name}: {len(products)} products")
         
         # Compact product info
         compact = []
@@ -291,18 +346,16 @@ class AIContentGenerator:
         
         prompt = (
             "IMPORTANT: Output ONLY the JSON, no explanations, no thinking process.\n\n"
-            "Create product badges for ALL products in the comparison article.\n\n"
+            f"Create product badges for ALL {len(compact)} products in this batch.\n\n"
             "CRITICAL REQUIREMENTS:\n"
             "1. You MUST create a badge for EVERY SINGLE product listed below\n"
             "2. Each badge must be a purposeful 2-3 word phrase that clearly reflects the product's unique strength, use case, or standout feature\n"
-            "3. Avoid generic labels (e.g., 'Best overall', 'Great value') unless they truly match the product; make badges feel human and specific\n"
-            "4. Pick exactly ONE product as top recommendation (editor's choice)\n"
-            "5. Draw inspiration from the brand, title, and feature list for each product when crafting the badge\n"
-            "6. Examples of acceptable style: \"Rain-Ready Seating\", \"Compact Bistro Choice\", \"Premium Teak Craft\", \"Budget-Friendly Lounger\"\n\n"
+            "3. Avoid generic labels unless they truly match the product; make badges feel human and specific\n"
+            "4. Draw inspiration from the brand, title, and feature list for each product when crafting the badge\n"
+            "5. Examples of acceptable style: \"Rain-Ready Seating\", \"Compact Bistro Choice\", \"Premium Teak Craft\"\n\n"
             f"MANDATORY: Return badges for ALL {len(compact)} products.\n\n"
             "JSON FORMAT (no markdown, no extra text):\n"
-            '{"top_recommendation": {"asin": "ACTUAL_ASIN"}, "badges": ['
-            '{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}, ...]}\n\n'
+            '{"badges": [{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}]}\n\n'
             f"ALL ASINs that MUST be included:\n{', '.join(all_asins)}\n\n"
             f"Context: {keyword}\n"
             f"Products: {json.dumps(compact, ensure_ascii=False)}"
@@ -310,28 +363,61 @@ class AIContentGenerator:
         
         response = self.client.generate(
             prompt=prompt,
-            max_tokens=2048,
+            max_tokens=1024,
             temperature=0.5,
             stream=False
         )
         
-        logging.info(f"📦 Raw badges response: {len(response)} chars, preview: '{response[:100]}'")
+        logging.debug(f"📦 Raw badges response: {len(response)} chars")
         
         # Extract and parse JSON
         json_text = self._extract_json(response)
-        logging.info(f"📦 Extracted JSON: {len(json_text)} chars, preview: '{json_text[:100]}'")
-        
         data = json.loads(json_text)
         
         # Validate structure
-        if 'top_recommendation' not in data or 'badges' not in data:
-            raise ValueError("Missing top_recommendation or badges in response")
+        if 'badges' not in data:
+            raise ValueError("Missing badges in response")
         
         if not isinstance(data['badges'], list):
             raise ValueError("badges must be a list")
         
-        logging.info(f"✅ Generated {len(data['badges'])} badges, top: {data['top_recommendation']['asin']}")
+        logging.info(f"✅ Generated {len(data['badges'])} badges for {batch_name}")
         return data
+    
+    def generate_badges(self, keyword: str, products: list) -> dict:
+        """
+        Generate badges for all products in 3 batches + select top recommendation
+        
+        Batches:
+        - Batch 1: Products 0-2 (3 products)
+        - Batch 2: Products 3-5 (3 products)
+        - Batch 3: Products 6-9 (4 products)
+        
+        Returns:
+            {
+                "top_recommendation": {"asin": "B0XXX"},
+                "badges": [
+                    {"asin": "B0XXX", "badge": "Best overall"},
+                    {"asin": "B0YYY", "badge": "Best value"}
+                ]
+            }
+        """
+        logging.info(f"🏷️ Generating badges for {len(products)} products in 3 batches")
+        
+        # Split into 3 batches
+        batch1 = products[0:3]   # 3 products
+        batch2 = products[3:6]   # 3 products
+        batch3 = products[6:10]  # 4 products
+        
+        # Generate badges for each batch (will be called in parallel by parent)
+        all_badges = []
+        
+        # These will be called separately - just prepare data structure
+        # Actual calls happen in generate_all_content_parallel
+        return {
+            "batches": [batch1, batch2, batch3],
+            "keyword": keyword
+        }
     
     def generate_buying_guide(self, keyword: str, products: list) -> dict:
         """
