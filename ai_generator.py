@@ -114,20 +114,20 @@ class AIContentGenerator:
             except Exception as e:
                 logging.error(f"❌ FAQs failed after all retries: {e}")
                 raise
+            
+            # Wave 3: Product Reviews (3 batches parallel - max 2 at a time)
+            logging.info("\n⚡ Wave 3: Generating Product Reviews in 3 batches...")
         
-        # Wave 3: Product Reviews (3 batches parallel - max 2 at a time)
-        logging.info("\n⚡ Wave 3: Generating Product Reviews in 3 batches...")
-        
-        # Split products into 3 batches
-        batch1 = products[0:3]   # 3 products
-        batch2 = products[3:6]   # 3 products  
-        batch3 = products[6:10]  # 4 products
-        
-        # Wave 3a: Batch 1 + Batch 2 (parallel)
-        logging.info("\n  Wave 3a: Review Batch 1 (3 prods) + Batch 2 (3 prods) in parallel...")
-        
-        future_review1 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch1, keyword)
-        future_review2 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch2, keyword)
+            # Split products into 3 batches
+            batch1 = products[0:3]   # 3 products
+            batch2 = products[3:6]   # 3 products  
+            batch3 = products[6:10]  # 4 products
+            
+            # Wave 3a: Batch 1 + Batch 2 (parallel)
+            logging.info("\n  Wave 3a: Review Batch 1 (3 prods) + Batch 2 (3 prods) in parallel...")
+            
+            future_review1 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch1, keyword)
+            future_review2 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch2, keyword)
         
         reviews_map = {}
         
