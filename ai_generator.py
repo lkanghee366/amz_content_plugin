@@ -308,55 +308,30 @@ class AIContentGenerator:
             f"Products: {json.dumps(compact, ensure_ascii=False)}"
         )
         
-        max_attempts = 3
-        last_error = None
+        response = self.client.generate(
+            prompt=prompt,
+            max_tokens=2048,
+            temperature=0.5,
+            stream=False
+        )
         
-        for attempt in range(max_attempts):
-            try:
-                logging.info(f"🔄 Badges generation attempt {attempt + 1}/{max_attempts}")
-                
-                response = self.client.generate(
-                    prompt=prompt,
-                    max_tokens=2048,
-                    temperature=0.5,
-                    stream=False
-                )
-                
-                logging.info(f"📦 Raw badges response: {len(response)} chars, preview: '{response[:100]}'")
-                
-                # Extract and parse JSON
-                json_text = self._extract_json(response)
-                logging.info(f"📦 Extracted JSON: {len(json_text)} chars, preview: '{json_text[:100]}'")
-                
-                data = json.loads(json_text)
-                
-                # Validate structure
-                if 'top_recommendation' not in data or 'badges' not in data:
-                    raise ValueError("Missing top_recommendation or badges in response")
-                
-                if not isinstance(data['badges'], list):
-                    raise ValueError("badges must be a list")
-                
-                logging.info(f"✅ Generated {len(data['badges'])} badges, top: {data['top_recommendation']['asin']}")
-                return data
-                
-            except json.JSONDecodeError as e:
-                last_error = f"JSON parse error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
-                    
-            except Exception as e:
-                last_error = f"Generation error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed")
+        logging.info(f"📦 Raw badges response: {len(response)} chars, preview: '{response[:100]}'")
         
-        raise Exception(f"Failed to generate badges after {max_attempts} attempts. Last error: {last_error}")
+        # Extract and parse JSON
+        json_text = self._extract_json(response)
+        logging.info(f"📦 Extracted JSON: {len(json_text)} chars, preview: '{json_text[:100]}'")
+        
+        data = json.loads(json_text)
+        
+        # Validate structure
+        if 'top_recommendation' not in data or 'badges' not in data:
+            raise ValueError("Missing top_recommendation or badges in response")
+        
+        if not isinstance(data['badges'], list):
+            raise ValueError("badges must be a list")
+        
+        logging.info(f"✅ Generated {len(data['badges'])} badges, top: {data['top_recommendation']['asin']}")
+        return data
     
     def generate_buying_guide(self, keyword: str, products: list) -> dict:
         """
@@ -397,56 +372,31 @@ class AIContentGenerator:
             f"Context: {keyword}"
         )
         
-        max_attempts = 3
-        last_error = None
+        response = self.client.generate(
+            prompt=prompt,
+            max_tokens=2048,
+            temperature=0.5,
+            stream=False
+        )
         
-        for attempt in range(max_attempts):
-            try:
-                logging.info(f"🔄 Buying guide generation attempt {attempt + 1}/{max_attempts}")
-                
-                response = self.client.generate(
-                    prompt=prompt,
-                    max_tokens=2048,
-                    temperature=0.5,
-                    stream=False
-                )
-                
-                # Extract and parse JSON
-                json_text = self._extract_json(response)
-                data = json.loads(json_text)
-                
-                # Handle different response formats
-                if 'title' in data and 'sections' in data:
-                    final_data = data
-                elif isinstance(data, list) and len(data) > 0 and 'heading' in data[0]:
-                    # AI returned sections array directly
-                    final_data = {
-                        'title': f"Buying Guide: {keyword.title()}",
-                        'sections': data
-                    }
-                else:
-                    raise ValueError("Invalid buying guide schema")
-                
-                logging.info(f"✅ Generated buying guide with {len(final_data['sections'])} sections")
-                return final_data
-                
-            except json.JSONDecodeError as e:
-                last_error = f"JSON parse error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
-                    
-            except Exception as e:
-                last_error = f"Generation error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed")
+        # Extract and parse JSON
+        json_text = self._extract_json(response)
+        data = json.loads(json_text)
         
-        raise Exception(f"Failed to generate buying guide after {max_attempts} attempts. Last error: {last_error}")
+        # Handle different response formats
+        if 'title' in data and 'sections' in data:
+            final_data = data
+        elif isinstance(data, list) and len(data) > 0 and 'heading' in data[0]:
+            # AI returned sections array directly
+            final_data = {
+                'title': f"Buying Guide: {keyword.title()}",
+                'sections': data
+            }
+        else:
+            raise ValueError("Invalid buying guide schema")
+        
+        logging.info(f"✅ Generated buying guide with {len(final_data['sections'])} sections")
+        return final_data
     
     def generate_faqs(self, keyword: str, products: list) -> list:
         """
@@ -483,54 +433,29 @@ class AIContentGenerator:
             f"Context: {keyword}"
         )
         
-        max_attempts = 3
-        last_error = None
+        response = self.client.generate(
+            prompt=prompt,
+            max_tokens=2048,
+            temperature=0.5,
+            stream=False
+        )
         
-        for attempt in range(max_attempts):
-            try:
-                logging.info(f"🔄 FAQs generation attempt {attempt + 1}/{max_attempts}")
-                
-                response = self.client.generate(
-                    prompt=prompt,
-                    max_tokens=2048,
-                    temperature=0.5,
-                    stream=False
-                )
-                
-                # Extract and parse JSON
-                json_text = self._extract_json(response)
-                faqs = json.loads(json_text)
-                
-                # Validate structure
-                if not isinstance(faqs, list):
-                    raise ValueError("FAQs must be a list")
-                
-                if len(faqs) == 0:
-                    raise ValueError("FAQs list is empty")
-                
-                if 'question' not in faqs[0] or 'answer' not in faqs[0]:
-                    raise ValueError("Invalid FAQ schema")
-                
-                logging.info(f"✅ Generated {len(faqs)} FAQs")
-                return faqs
-                
-            except json.JSONDecodeError as e:
-                last_error = f"JSON parse error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
-                    
-            except Exception as e:
-                last_error = f"Generation error: {e}"
-                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
-                if attempt < max_attempts - 1:
-                    logging.info(f"🔄 Retrying immediately...")
-                else:
-                    logging.error(f"❌ All attempts failed")
+        # Extract and parse JSON
+        json_text = self._extract_json(response)
+        faqs = json.loads(json_text)
         
-        raise Exception(f"Failed to generate FAQs after {max_attempts} attempts. Last error: {last_error}")
+        # Validate structure
+        if not isinstance(faqs, list):
+            raise ValueError("FAQs must be a list")
+        
+        if len(faqs) == 0:
+            raise ValueError("FAQs list is empty")
+        
+        if 'question' not in faqs[0] or 'answer' not in faqs[0]:
+            raise ValueError("Invalid FAQ schema")
+        
+        logging.info(f"✅ Generated {len(faqs)} FAQs")
+        return faqs
     
     def generate_product_reviews_batch(self, products: list, keyword: str) -> dict:
         """
