@@ -5,6 +5,7 @@ Generates: Intro, Badges, Editor's Choice, Buying Guide, FAQs
 import json
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from unified_ai_client import UnifiedAIClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,6 +16,38 @@ class AIContentGenerator:
     def __init__(self, ai_client: UnifiedAIClient):
         """Initialize with Unified AI client"""
         self.client = ai_client
+        self.max_retries = 3
+    
+    def _generate_with_retry(self, func, *args, **kwargs):
+        """
+        Execute a generation function with retry logic
+        
+        Args:
+            func: Function to execute
+            *args, **kwargs: Arguments to pass to function
+            
+        Returns:
+            Result from function
+            
+        Raises:
+            Exception: If all retries fail
+        """
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                logging.info(f"   Attempt {attempt}/{self.max_retries}")
+                result = func(*args, **kwargs)
+                if attempt > 1:
+                    logging.info(f"   ✓ Succeeded on retry {attempt}")
+                return result
+            except Exception as e:
+                last_error = e
+                logging.warning(f"   ⚠️ Attempt {attempt} failed: {e}")
+                if attempt < self.max_retries:
+                    logging.info(f"   🔄 Retrying...")
+        
+        # All retries failed
+        raise Exception(f"Failed after {self.max_retries} attempts. Last error: {last_error}")
     
     def _extract_json(self, text: str) -> str:
         """Extract JSON from AI response (handles markdown code blocks)"""
@@ -651,3 +684,116 @@ class AIContentGenerator:
             "pros": ["Quality build", "Good features", "Reliable performance"],
             "cons": ["Price may vary", "Limited availability"]
         }
+
+    def generate_all_content_parallel(self, keyword: str, products: list) -> dict:
+        """
+        Generate all content sections in parallel (max 3 concurrent)
+        3 Waves: Intro+Badges, Guide+FAQs, Reviews (3 batches)
+        
+        Args:
+            keyword: Search keyword
+            products: List of product data
+            
+        Returns:
+            dict: All generated content sections
+            
+        Raises:
+            Exception: If any section fails after retries
+        """
+        logging.info("🚀 Starting parallel content generation (3 waves, max 3 concurrent)...")
+        
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Wave 1: Intro + Badges (parallel)
+            logging.info("\n⚡ Wave 1: Generating Intro + Badges in parallel...")
+            
+            future_intro = executor.submit(self._generate_with_retry, self.generate_intro, keyword)
+            future_badges = executor.submit(self._generate_with_retry, self.generate_badges, keyword, products)
+            
+            try:
+                logging.info("📝 Waiting for Intro...")
+                results['intro'] = future_intro.result()
+                logging.info("✅ Intro complete")
+            except Exception as e:
+                logging.error(f"❌ Intro failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("🏆 Waiting for Badges...")
+                results['badges'] = future_badges.result()
+                logging.info("✅ Badges complete")
+            except Exception as e:
+                logging.error(f"❌ Badges failed after all retries: {e}")
+                raise
+            
+            # Wave 2: Guide + FAQs (parallel)
+            logging.info("\n⚡ Wave 2: Generating Guide + FAQs in parallel...")
+            
+            future_guide = executor.submit(self._generate_with_retry, self.generate_buying_guide, keyword, products)
+            future_faqs = executor.submit(self._generate_with_retry, self.generate_faqs, keyword, products)
+            
+            try:
+                logging.info("📚 Waiting for Buying Guide...")
+                results['guide'] = future_guide.result()
+                logging.info("✅ Guide complete")
+            except Exception as e:
+                logging.error(f"❌ Guide failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("❓ Waiting for FAQs...")
+                results['faqs'] = future_faqs.result()
+                logging.info("✅ FAQs complete")
+            except Exception as e:
+                logging.error(f"❌ FAQs failed after all retries: {e}")
+                raise
+            
+            # Wave 3: Product Reviews (3 batches all parallel)
+            logging.info("\n⚡ Wave 3: Product Reviews - All 3 batches in parallel...")
+            
+            # Split products into 3 batches
+            batch1 = products[0:3]   # 3 products
+            batch2 = products[3:6]   # 3 products  
+            batch3 = products[6:10]  # 4 products
+            
+            # Submit all 3 batches at once (executor handles max 3 concurrent)
+            logging.info("  Submitting Batch 1 (3 prods), Batch 2 (3 prods), Batch 3 (4 prods)...")
+            
+            future_review1 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch1, keyword)
+            future_review2 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch2, keyword)
+            future_review3 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch3, keyword)
+            
+            reviews_map = {}
+            
+            try:
+                logging.info("📝 Waiting for Review Batch 1...")
+                batch1_reviews = future_review1.result()
+                reviews_map.update(batch1_reviews)
+                logging.info(f"✅ Review Batch 1 complete ({len(batch1_reviews)} reviews)")
+            except Exception as e:
+                logging.error(f"❌ Review Batch 1 failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("📝 Waiting for Review Batch 2...")
+                batch2_reviews = future_review2.result()
+                reviews_map.update(batch2_reviews)
+                logging.info(f"✅ Review Batch 2 complete ({len(batch2_reviews)} reviews)")
+            except Exception as e:
+                logging.error(f"❌ Review Batch 2 failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("📝 Waiting for Review Batch 3...")
+                batch3_reviews = future_review3.result()
+                reviews_map.update(batch3_reviews)
+                logging.info(f"✅ Review Batch 3 complete ({len(batch3_reviews)} reviews)")
+            except Exception as e:
+                logging.error(f"❌ Review Batch 3 failed after all retries: {e}")
+                raise
+            
+            results['reviews'] = reviews_map
+        
+        logging.info(f"\n✅ All parallel content generation complete! Total reviews: {len(reviews_map)}")
+        return results

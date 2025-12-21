@@ -129,7 +129,7 @@ class AmazonWPPoster:
             
             logging.info(f"✅ Found {len(products)} products")
             
-            # Step 2: Generate AI content (PARALLEL)
+            # Step 2: Generate AI content (PARALLEL - 3 waves, max 3 concurrent)
             logging.info("\n🤖 Step 2: Generating AI content in parallel...")
             
             # Generate ALL content in parallel (Intro, Badges, Guide, FAQs, Reviews)
@@ -151,9 +151,9 @@ class AmazonWPPoster:
                 intro=intro,
                 products=products,
                 badges_data=badges_data,
+                reviews_map=reviews_map,
                 buying_guide=buying_guide,
-                faqs=faqs,
-                reviews_map=reviews_map
+                faqs=faqs
             )
             
             # Step 4: Post to WordPress

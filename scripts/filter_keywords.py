@@ -55,7 +55,7 @@ DEFAULT_QUESTION_PREFIXES = ['what', 'how', 'where', 'who', 'which', 'why']
 
 # ===== SUBSTRING REMOVAL PATTERNS =====
 # Remove nếu keyword CHỨA các substring này (không cần whole-word)
-DEFAULT_SUBSTRING_REMOVE = ['how', 'troubleshooting', 'mistakes']  # Remove bất kỳ đâu trong keyword
+DEFAULT_SUBSTRING_REMOVE = ['how', 'troubleshooting']  # Remove bất kỳ đâu trong keyword
 
 
 def build_word_regex(words, whole_word=True):

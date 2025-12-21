@@ -35,25 +35,25 @@
     },
     {
       "id": 4,
-      "name": "AirFryerRadar",
-      "site_url": "https://airfryerradar.com",
+      "name": "Toolz Advisor",
+      "site_url": "https://toolzadvisor.com",
       "username": "admin",
-      "app_password": "Dt8d EHif BKlg KNiB xrbx brbI",
+      "app_password": "fjEn M8r2 MhEb FOtS 3MKU HsiF",
       "author_id": 1,
-      "category_id": 20,
-      "status": "publish",
-      "keyword_file": "keywords/roaster_oven.txt"
+      "category_id": 1,
+      "status": "draft",
+      "keyword_file": "keywords/roaster_oven_filtered.txt"
     },
     {
       "id": 5,
-      "name": "LumbermensHomes",
-      "site_url": "https://www.lumbermenshomes.com",
+      "name": "Purehomex",
+      "site_url": "https://purehomex.com",
       "username": "admin",
-      "app_password": "uox0 u3pe BAND 9aDq OSy1 eubR",
+      "app_password": "OB2J eIgr aaEj HypC cZ1i 2xHn",
       "author_id": 1,
-      "category_id": 11,
-      "status": "publish",
-      "keyword_file": "keywords/survival_tools.txt"
+      "category_id": 1,
+      "status": "draft",
+      "keyword_file": "keywords/toaster_keywords_copy.txt"
     }
   ]
 }
