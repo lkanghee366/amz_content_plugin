@@ -29,7 +29,6 @@ class WordPressAPI:
         self.session = requests.Session()
         self.session.auth = (username, app_password)
         self.session.headers.update({
-            'Content-Type': 'application/json',
             'User-Agent': 'Amazon-WP-Poster/1.0'
         })
         
@@ -38,7 +37,15 @@ class WordPressAPI:
     def test_connection(self) -> bool:
         """Test API connection and authentication"""
         try:
-            response = self.session.get(f"{self.api_base}/users/me", timeout=30)
+            # Use minimal headers for GET request
+            response = requests.get(
+                f"{self.api_base}/users/me",
+                auth=(self.username, self.app_password),
+                headers={
+                    'Accept': 'application/json'
+                },
+                timeout=30
+            )
             if response.status_code == 200:
                 user = response.json()
                 logging.info(f"✅ Connected as: {user.get('name', 'Unknown')}")
@@ -99,9 +106,15 @@ class WordPressAPI:
             post_data['tags'] = tags
         
         try:
-            response = self.session.post(
+            # Use requests.post directly with explicit headers
+            response = requests.post(
                 f"{self.api_base}/posts",
                 json=post_data,
+                auth=(self.username, self.app_password),
+                headers={
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 timeout=30
             )
             
@@ -154,9 +167,15 @@ class WordPressAPI:
             update_data['status'] = status
         
         try:
-            response = self.session.post(
+            # Use requests.post directly with explicit headers
+            response = requests.post(
                 f"{self.api_base}/posts/{post_id}",
                 json=update_data,
+                auth=(self.username, self.app_password),
+                headers={
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 timeout=30
             )
             

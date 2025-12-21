@@ -1,0 +1,51 @@
+================================================================================
+PROMPT:
+================================================================================
+IMPORTANT: Output ONLY the JSON, no explanations, no thinking process.
+
+Create product badges for ALL products in the comparison article.
+
+CRITICAL REQUIREMENTS:
+1. You MUST create a badge for EVERY SINGLE product listed below
+2. Each badge must be a purposeful 2-3 word phrase that clearly reflects the product's unique strength, use case, or standout feature
+3. Avoid generic labels (e.g., 'Best overall', 'Great value') unless they truly match the product; make badges feel human and specific
+4. Pick exactly ONE product as top recommendation (editor's choice)
+5. Draw inspiration from the brand, title, and feature list for each product when crafting the badge
+6. Examples of acceptable style: "Rain-Ready Seating", "Compact Bistro Choice", "Premium Teak Craft", "Budget-Friendly Lounger"
+
+MANDATORY: Return badges for ALL 2 products.
+
+JSON FORMAT (no markdown, no extra text):
+{"top_recommendation": {"asin": "ACTUAL_ASIN"}, "badges": [{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}, ...]}
+
+ALL ASINs that MUST be included:
+B0TEST1, B0TEST2
+
+Context: the best slow cooker roast
+Products: [{"asin": "B0TEST1", "title": "Test Slow Cooker 1 - 6 Quart Programmable", "price": "$49.99", "brand": "TestBrand", "features": ["6 quart capacity", "Programmable timer", "Keep warm function"]}, {"asin": "B0TEST2", "title": "Test Slow Cooker 2 - 8 Quart Digital", "price": "$69.99", "brand": "TestBrand2", "features": ["8 quart capacity", "Digital display", "Auto shutoff"]}]
+
+================================================================================
+RESPONSE:
+================================================================================
+IMPORTANT: Output ONLY the JSON, no explanations, no thinking process.
+
+Create product badges for ALL products in the comparison article.
+
+CRITICAL REQUIREMENTS:
+1. You MUST create a badge for EVERY SINGLE product listed below
+2. Each badge must be a purposeful 2-3 word phrase that clearly reflects the product's unique strength, use case, or standout feature
+3. Avoid generic labels (e.g., 'Best overall', 'Great value') unless they truly match the product; make badges feel human and specific
+4. Pick exactly ONE product as top recommendation (editor's choice)
+5. Draw inspiration from the brand, title, and feature list for each product when crafting the badge
+6. Examples of acceptable style: "Rain-Ready Seating", "Compact Bistro Choice", "Premium Teak Craft", "Budget-Friendly Lounger"
+
+MANDATORY: Return badges for ALL 2 products.
+
+JSON FORMAT (no markdown, no extra text):
+{"top_recommendation": {"asin": "ACTUAL_ASIN"}, "badges": [{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}, ...]}
+
+ALL ASINs that MUST be included:
+B0TEST1, B0TEST2
+
+Context: the best slow cooker roast
+Products: [{"asin": "B0TEST1", "title": "Test Slow Cooker 1 - 6 Quart Programmable", "price": "$49.99", "brand": "TestBrand", "features": ["6 quart capacity", "Programmable timer", "Keep warm function"]}, {"asin": "B0TEST2", "title": "Test Slow Cooker 2 - 8 Quart Digital", "price": "$69.99", "brand": "TestBrand2", "features": ["8 quart capacity", "Digital display", "Auto shutoff"]}]

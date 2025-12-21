@@ -5,6 +5,7 @@ Generates: Intro, Badges, Editor's Choice, Buying Guide, FAQs
 import json
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from unified_ai_client import UnifiedAIClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,6 +16,106 @@ class AIContentGenerator:
     def __init__(self, ai_client: UnifiedAIClient):
         """Initialize with Unified AI client"""
         self.client = ai_client
+        self.max_retries = 3
+    
+    def _generate_with_retry(self, func, *args, **kwargs):
+        """
+        Execute a generation function with retry logic
+        
+        Args:
+            func: Function to execute
+            *args, **kwargs: Arguments to pass to function
+            
+        Returns:
+            Result from function
+            
+        Raises:
+            Exception: If all retries fail
+        """
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                logging.info(f"   Attempt {attempt}/{self.max_retries}")
+                result = func(*args, **kwargs)
+                if attempt > 1:
+                    logging.info(f"   ✓ Succeeded on retry {attempt}")
+                return result
+            except Exception as e:
+                last_error = e
+                logging.warning(f"   ⚠️ Attempt {attempt} failed: {e}")
+                if attempt < self.max_retries:
+                    logging.info(f"   🔄 Retrying...")
+        
+        # All retries failed
+        raise Exception(f"Failed after {self.max_retries} attempts. Last error: {last_error}")
+    
+    def generate_all_content_parallel(self, keyword: str, products: list) -> dict:
+        """
+        Generate all content sections in parallel (max 2 concurrent)
+        
+        Args:
+            keyword: Search keyword
+            products: List of product data
+            
+        Returns:
+            dict: All generated content sections
+            
+        Raises:
+            Exception: If any section fails after retries
+        """
+        logging.info("🚀 Starting parallel content generation...")
+        
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Wave 1: Intro + Badges (parallel)
+            logging.info("\n⚡ Wave 1: Generating Intro + Badges in parallel...")
+            
+            future_intro = executor.submit(self._generate_with_retry, self.generate_intro, keyword)
+            future_badges = executor.submit(self._generate_with_retry, self.generate_badges, keyword, products)
+            
+            # Wait for Wave 1 to complete
+            try:
+                logging.info("📝 Waiting for Intro...")
+                results['intro'] = future_intro.result()
+                logging.info("✅ Intro complete")
+            except Exception as e:
+                logging.error(f"❌ Intro failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("🏆 Waiting for Badges...")
+                results['badges'] = future_badges.result()
+                logging.info("✅ Badges complete")
+            except Exception as e:
+                logging.error(f"❌ Badges failed after all retries: {e}")
+                raise
+            
+            # Wave 2: Guide + FAQs (parallel)
+            logging.info("\n⚡ Wave 2: Generating Guide + FAQs in parallel...")
+            
+            future_guide = executor.submit(self._generate_with_retry, self.generate_buying_guide, keyword, products)
+            future_faqs = executor.submit(self._generate_with_retry, self.generate_faqs, keyword, products)
+            
+            # Wait for Wave 2 to complete
+            try:
+                logging.info("📚 Waiting for Buying Guide...")
+                results['guide'] = future_guide.result()
+                logging.info("✅ Guide complete")
+            except Exception as e:
+                logging.error(f"❌ Guide failed after all retries: {e}")
+                raise
+            
+            try:
+                logging.info("❓ Waiting for FAQs...")
+                results['faqs'] = future_faqs.result()
+                logging.info("✅ FAQs complete")
+            except Exception as e:
+                logging.error(f"❌ FAQs failed after all retries: {e}")
+                raise
+        
+        logging.info("\n✅ All parallel content generation complete!")
+        return results
     
     def _extract_json(self, text: str) -> str:
         """Extract JSON from AI response (handles markdown code blocks)"""
@@ -430,3 +531,224 @@ class AIContentGenerator:
                     logging.error(f"❌ All attempts failed")
         
         raise Exception(f"Failed to generate FAQs after {max_attempts} attempts. Last error: {last_error}")
+    
+    def generate_product_reviews_batch(self, products: list, keyword: str) -> dict:
+        """
+        Generate product reviews for multiple products in a single API call (batch mode)
+        
+        Args:
+            products: List of product dicts (max 10)
+            keyword: Search keyword for context
+            
+        Returns:
+            dict mapping ASIN to review:
+            {
+                "B08XYZ123": {
+                    "description": "100-word description...",
+                    "pros": ["Reason 1", "Reason 2", "Reason 3"],
+                    "cons": ["Reason 1", "Reason 2"]
+                },
+                ...
+            }
+        """
+        if not products:
+            return {}
+            
+        logging.info(f"📝 Generating batch reviews for {len(products)} products...")
+        
+        # Build prompt with all products
+        products_info = []
+        for idx, product in enumerate(products, 1):
+            title = product['title']
+            if len(title) > 100:
+                title = title[:97] + '…'
+            
+            features_text = '\n  '.join(f"- {f}" for f in (product['features'][:5] if product['features'] else []))
+            
+            product_text = (
+                f"Product {idx} (ASIN: {product['asin']}):\n"
+                f"  Title: {title}\n"
+                f"  Brand: {product.get('brand', 'N/A')}\n"
+                f"  Price: {product.get('price', 'N/A')}\n"
+                f"  Features:\n  {features_text}\n"
+            )
+            products_info.append(product_text)
+        
+        all_products_text = '\n'.join(products_info)
+        
+        # Build example JSON structure
+        example_json = '{\n'
+        example_json += '  "B08XYZ123": {"description": "A 100-word description...", "pros": ["Great capacity", "Easy to use", "Durable build"], "cons": ["Pricey", "Heavy"]}'
+        if len(products) > 1:
+            example_json += ',\n  "B09ABC456": {"description": "Another 100-word description...", "pros": ["Compact design", "Fast performance"], "cons": ["Limited features"]}'
+        example_json += '\n}'
+        
+        prompt = (
+            f"Create product reviews for {len(products)} products with descriptions and pros/cons.\n"
+            "IMPORTANT: Return ONLY valid JSON (no markdown, no extra text):\n\n"
+            f"{example_json}\n\n"
+            "Requirements for EACH product:\n"
+            "- Description: Exactly 80-120 words, natural and engaging\n"
+            "- Pros: 3-5 reasons to buy (short phrases, 3-6 words each)\n"
+            "- Cons: 2-3 reasons not to buy (short phrases, 3-6 words each)\n"
+            "- Be specific and helpful for buyers\n"
+            "- Use the exact ASIN as the key\n\n"
+            f"Context: {keyword}\n\n"
+            f"Products:\n{all_products_text}"
+        )
+        
+        max_attempts = 3
+        last_error = None
+        
+        for attempt in range(max_attempts):
+            try:
+                logging.debug(f"🔄 Batch review attempt {attempt + 1}/{max_attempts}")
+                
+                response = self.client.generate(
+                    prompt=prompt,
+                    max_tokens=2048,  # Increased for multiple products
+                    temperature=0.6,
+                    stream=False
+                )
+                
+                # Extract and parse JSON
+                json_text = self._extract_json(response)
+                reviews = json.loads(json_text)
+                
+                # Validate structure
+                if not isinstance(reviews, dict):
+                    raise ValueError("Reviews must be a dict")
+                
+                # Validate each review
+                for asin, review in reviews.items():
+                    if not isinstance(review, dict):
+                        raise ValueError(f"Review for {asin} must be a dict")
+                    
+                    if 'description' not in review or 'pros' not in review or 'cons' not in review:
+                        raise ValueError(f"Missing required fields for {asin}")
+                    
+                    if not isinstance(review['pros'], list) or not isinstance(review['cons'], list):
+                        raise ValueError(f"Pros and cons must be lists for {asin}")
+                
+                # Log success
+                total_words = sum(len(r['description'].split()) for r in reviews.values())
+                logging.info(f"✅ Generated {len(reviews)} batch reviews ({total_words} total words)")
+                
+                return reviews
+                
+            except json.JSONDecodeError as e:
+                last_error = f"JSON parse error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.debug(f"🔄 Retrying...")
+                    
+            except Exception as e:
+                last_error = f"Generation error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.debug(f"🔄 Retrying...")
+        
+        # Fallback if all attempts fail - create individual fallbacks
+        logging.error(f"❌ Failed to generate batch reviews, using fallback for each product")
+        fallback_reviews = {}
+        for product in products:
+            fallback_reviews[product['asin']] = {
+                "description": f"This {product.get('brand', '')} product offers {' and '.join(product['features'][:3]) if product['features'] else 'great features'}. A solid choice for {keyword}.",
+                "pros": ["Quality build", "Good features", "Reliable performance"],
+                "cons": ["Price may vary", "Limited availability"]
+            }
+        return fallback_reviews
+
+    def generate_product_review(self, product: dict, keyword: str) -> dict:
+        """
+        Generate product review with description + pros/cons
+        
+        Returns:
+            {
+                "description": "100-word description...",
+                "pros": ["Reason 1", "Reason 2", "Reason 3"],
+                "cons": ["Reason 1", "Reason 2"]
+            }
+        """
+        logging.info(f"📝 Generating review for: {product['title'][:50]}...")
+        
+        # Build compact product info
+        title = product['title']
+        if len(title) > 100:
+            title = title[:97] + '…'
+        
+        features_text = '\n'.join(f"- {f}" for f in (product['features'][:8] if product['features'] else []))
+        
+        prompt = (
+            "Create a product review with description and pros/cons.\n"
+            "IMPORTANT: Return ONLY this exact JSON format (no markdown, no extra text):\n\n"
+            '{"description": "A 100-word description highlighting key features and use cases...", '
+            '"pros": ["Great capacity", "Easy to use", "Durable build"], '
+            '"cons": ["Pricey", "Heavy"]}\n\n'
+            "Requirements:\n"
+            "- Description: Exactly 80-120 words, natural and engaging\n"
+            "- Pros: 3-5 reasons to buy (short phrases, 3-6 words each)\n"
+            "- Cons: 2-3 reasons not to buy (short phrases, 3-6 words each)\n"
+            "- Be specific and helpful for buyers\n\n"
+            f"Context: {keyword}\n"
+            f"Product: {title}\n"
+            f"Brand: {product.get('brand', 'N/A')}\n"
+            f"Price: {product.get('price', 'N/A')}\n"
+            f"Features:\n{features_text}"
+        )
+        
+        max_attempts = 3
+        last_error = None
+        
+        for attempt in range(max_attempts):
+            try:
+                logging.debug(f"🔄 Product review attempt {attempt + 1}/{max_attempts}")
+                
+                response = self.client.generate(
+                    prompt=prompt,
+                    max_tokens=512,
+                    temperature=0.6,
+                    stream=False
+                )
+                
+                # Extract and parse JSON
+                json_text = self._extract_json(response)
+                review = json.loads(json_text)
+                
+                # Validate structure
+                if not isinstance(review, dict):
+                    raise ValueError("Review must be a dict")
+                
+                if 'description' not in review or 'pros' not in review or 'cons' not in review:
+                    raise ValueError("Missing required fields")
+                
+                if not isinstance(review['pros'], list) or not isinstance(review['cons'], list):
+                    raise ValueError("Pros and cons must be lists")
+                
+                # Validate word count
+                word_count = len(review['description'].split())
+                if word_count < 60 or word_count > 150:
+                    logging.warning(f"⚠️ Description word count: {word_count} (expected 80-120)")
+                
+                logging.info(f"✅ Generated review ({word_count} words, {len(review['pros'])} pros, {len(review['cons'])} cons)")
+                return review
+                
+            except json.JSONDecodeError as e:
+                last_error = f"JSON parse error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.debug(f"🔄 Retrying...")
+                    
+            except Exception as e:
+                last_error = f"Generation error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.debug(f"🔄 Retrying...")
+        
+        # Fallback if all attempts fail
+        logging.error(f"❌ Failed to generate review, using fallback")
+        return {
+            "description": f"This {product.get('brand', '')} product offers {' and '.join(product['features'][:3]) if product['features'] else 'great features'}. A solid choice for {keyword}.",
+            "pros": ["Quality build", "Good features", "Reliable performance"],
+            "cons": ["Price may vary", "Limited availability"]
+        }

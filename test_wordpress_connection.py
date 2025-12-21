@@ -8,12 +8,12 @@ print("\n" + "="*60)
 print("WordPress Connection Test")
 print("="*60)
 
-# Test ProKitchenReview
-print("\nTesting ProKitchenReview...")
+# Test MountainTidesWine
+print("\nTesting MountainTidesWine...")
 wp = WordPressAPI(
-    site_url="https://prokitchenreview.com",
+    site_url="https://www.mountaintideswine.com",
     username="admin",
-    app_password="5A03 TYh3 3BdE mKV9 pvWw zPc8"
+    app_password="IFJ5 sDd8 AFQe Z9cq BGmi 84bD"
 )
 
 result = wp.test_connection()

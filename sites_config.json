@@ -7,9 +7,9 @@
       "username": "alex",
       "app_password": "4o7v jSjz WmAL k46P eVvX dLVG",
       "author_id": 2,
-      "category_id": 10,
+      "category_id": 20,
       "status": "publish",
-      "keyword_file": "keywords/pots_soil_fertilizer.txt"
+      "keyword_file": "keywords/winter_product.txt"
     },
     {
       "id": 2,
@@ -29,9 +29,9 @@
       "username": "admin",
       "app_password": "IFJ5 sDd8 AFQe Z9cq BGmi 84bD",
       "author_id": 1,
-      "category_id": 26,
+      "category_id": 48,
       "status": "publish",
-      "keyword_file": "keywords/kitchenware_filtered.txt"
+      "keyword_file": "keywords/coffee_kw_1.txt"
     },
     {
       "id": 4,

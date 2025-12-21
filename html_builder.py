@@ -76,8 +76,8 @@ class HTMLBuilder:
         return html
     
     @staticmethod
-    def build_product_cards(keyword: str, products: list, badges_map: dict) -> str:
-        """Build product comparison cards section"""
+    def build_product_cards(keyword: str, products: list, badges_map: dict, reviews_map: dict = None) -> str:
+        """Build product comparison cards section with reviews"""
         html = '<div class="acap-compare-wrap">\n'
         html += f'  <h2>Product Comparison: {keyword.title()}</h2>\n'
         html += '  <div class="acap-vstack">\n'
@@ -85,6 +85,7 @@ class HTMLBuilder:
         for product in products:
             asin = product['asin']
             badge = badges_map.get(asin, '')
+            review = reviews_map.get(asin) if reviews_map else None
             
             html += '    <div class="acap-box">\n'
             
@@ -102,12 +103,42 @@ class HTMLBuilder:
             else:
                 html += '      <div class="acap-brand">—</div>\n'
             
-            # Features
-            if product.get('features'):
-                html += '      <ul class="acap-features">\n'
-                for feature in product['features']:
-                    html += f'        <li>{feature}</li>\n'
-                html += '      </ul>\n'
+            # Product Description (if review available)
+            if review and review.get('description'):
+                html += f'      <div class="acap-description">{review["description"]}</div>\n'
+            
+            # Pros & Cons (side by side)
+            if review:
+                html += '      <div class="acap-pros-cons">\n'
+                
+                # Pros column
+                if review.get('pros'):
+                    html += '        <div class="acap-pros">\n'
+                    html += '          <h4>✓ Reasons to Buy</h4>\n'
+                    html += '          <ul>\n'
+                    for pro in review['pros']:
+                        html += f'            <li>{pro}</li>\n'
+                    html += '          </ul>\n'
+                    html += '        </div>\n'
+                
+                # Cons column
+                if review.get('cons'):
+                    html += '        <div class="acap-cons">\n'
+                    html += '          <h4>✗ Reasons Not to Buy</h4>\n'
+                    html += '          <ul>\n'
+                    for con in review['cons']:
+                        html += f'            <li>{con}</li>\n'
+                    html += '          </ul>\n'
+                    html += '        </div>\n'
+                
+                html += '      </div>\n'
+            else:
+                # Fallback: Show features if no review
+                if product.get('features'):
+                    html += '      <ul class="acap-features">\n'
+                    for feature in product['features'][:8]:
+                        html += f'        <li>{feature}</li>\n'
+                    html += '      </ul>\n'
             
             html += f'      <a class="acap-btn" href="{product["url"]}" rel="nofollow sponsored noopener" target="_blank">Check price</a>\n'
             html += '    </div>\n'
@@ -156,14 +187,14 @@ class HTMLBuilder:
     
     @staticmethod
     def build_full_post(keyword: str, intro: str, products: list, badges_data: dict, 
-                       buying_guide: dict, faqs: list) -> str:
+                       buying_guide: dict, faqs: list, reviews_map: dict = None) -> str:
         """
         Build complete post content
         
         Structure:
         1. Introduction
         2. Editor's Choice + Best-for
-        3. Product Cards
+        3. Product Cards (with reviews if available)
         4. Buying Guide
         5. FAQs
         """
@@ -176,7 +207,7 @@ class HTMLBuilder:
         content = ""
         content += HTMLBuilder.build_intro(intro)
         content += HTMLBuilder.build_editors_choice(products, badges_map, top_asin)
-        content += HTMLBuilder.build_product_cards(keyword, products, badges_map)
+        content += HTMLBuilder.build_product_cards(keyword, products, badges_map, reviews_map)
         content += HTMLBuilder.build_buying_guide(buying_guide)
         content += HTMLBuilder.build_faqs(faqs)
         
