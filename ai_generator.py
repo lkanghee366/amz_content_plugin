@@ -704,7 +704,7 @@ class AIContentGenerator:
         
         results = {}
         
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             # Wave 1: Intro + Badges (parallel)
             logging.info("\n⚡ Wave 1: Generating Intro + Badges in parallel...")
             
