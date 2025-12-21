@@ -132,58 +132,16 @@ class AmazonWPPoster:
             # Step 2: Generate AI content (PARALLEL)
             logging.info("\n🤖 Step 2: Generating AI content in parallel...")
             
-            # Generate Intro, Badges, Guide, FAQs in parallel (2 waves)
+            # Generate ALL content in parallel (Intro, Badges, Guide, FAQs, Reviews)
             content = self.ai_generator.generate_all_content_parallel(keyword, products)
             
             intro = content['intro']
             badges_data = content['badges']
             buying_guide = content['guide']
             faqs = content['faqs']
-            
-            # 2.3 Product Reviews (Description + Pros/Cons) - BATCH MODE
-            logging.info("\n📝 Generating product reviews in batches...")
-            reviews_map = {}
-            
-            # Determine batch sizes: 3-3-4 for 10 products, adjust for fewer
-            total_products = len(products)
-            if total_products <= 3:
-                batches = [products]
-            elif total_products <= 6:
-                batches = [products[:3], products[3:]]
-            elif total_products <= 10:
-                # 3-3-4 pattern
-                batches = [products[:3], products[3:6], products[6:]]
-            else:
-                # For more than 10, keep 3-3-4 pattern and handle remaining
-                batches = [products[:3], products[3:6], products[6:10]]
-                # Add remaining in batches of 3
-                remaining = products[10:]
-                for i in range(0, len(remaining), 3):
-                    batches.append(remaining[i:i+3])
-            
-            # Process each batch
-            for batch_idx, batch in enumerate(batches, 1):
-                try:
-                    logging.info(f"  Batch {batch_idx}/{len(batches)}: Processing {len(batch)} products...")
-                    batch_reviews = self.ai_generator.generate_product_reviews_batch(batch, keyword)
-                    
-                    # Merge batch results
-                    reviews_map.update(batch_reviews)
-                    logging.info(f"  ✅ Batch {batch_idx} completed ({len(batch_reviews)} reviews)")
-                    
-                except Exception as e:
-                    logging.warning(f"  ⚠️ Batch {batch_idx} failed: {e}, trying individual fallback...")
-                    # Fallback to individual generation for this batch
-                    for product in batch:
-                        try:
-                            logging.info(f"    Fallback: {product['title'][:50]}...")
-                            review = self.ai_generator.generate_product_review(product, keyword)
-                            reviews_map[product['asin']] = review
-                        except Exception as e2:
-                            logging.warning(f"    ⚠️ Failed for {product['asin']}: {e2}")
+            reviews_map = content['reviews']
             
             logging.info(f"✅ Generated reviews for {len(reviews_map)}/{len(products)} products")
-            
             logging.info("✅ All AI content generated successfully!")
             
             # Step 3: Build HTML content
