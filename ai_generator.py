@@ -5,7 +5,6 @@ Generates: Intro, Badges, Editor's Choice, Buying Guide, FAQs
 import json
 import re
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from unified_ai_client import UnifiedAIClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,154 +15,6 @@ class AIContentGenerator:
     def __init__(self, ai_client: UnifiedAIClient):
         """Initialize with Unified AI client"""
         self.client = ai_client
-        self.max_retries = 3
-    
-    def _generate_with_retry(self, func, *args, **kwargs):
-        """
-        Execute a generation function with retry logic
-        
-        Args:
-            func: Function to execute
-            *args, **kwargs: Arguments to pass to function
-            
-        Returns:
-            Result from function
-            
-        Raises:
-            Exception: If all retries fail
-        """
-        last_error = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                logging.info(f"   Attempt {attempt}/{self.max_retries}")
-                result = func(*args, **kwargs)
-                if attempt > 1:
-                    logging.info(f"   ✓ Succeeded on retry {attempt}")
-                return result
-            except Exception as e:
-                last_error = e
-                logging.warning(f"   ⚠️ Attempt {attempt} failed: {e}")
-                if attempt < self.max_retries:
-                    logging.info(f"   🔄 Retrying...")
-        
-        # All retries failed
-        raise Exception(f"Failed after {self.max_retries} attempts. Last error: {last_error}")
-    
-    def generate_all_content_parallel(self, keyword: str, products: list) -> dict:
-        """
-        Generate all content sections in parallel (max 2 concurrent)
-        2 Waves: Intro+Badges, Guide+FAQs
-        
-        Args:
-            keyword: Search keyword
-            products: List of product data
-            
-        Returns:
-            dict: All generated content sections
-            
-        Raises:
-            Exception: If any section fails after retries
-        """
-        logging.info("🚀 Starting parallel content generation (2 waves)...")
-        
-        results = {}
-        
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            # Wave 1: Intro + Badges (all 10 products at once)
-            logging.info("\n⚡ Wave 1: Generating Intro + Badges (10 products) in parallel...")
-            
-            future_intro = executor.submit(self._generate_with_retry, self.generate_intro, keyword)
-            future_badges = executor.submit(self._generate_with_retry, self.generate_badges, keyword, products)
-            
-            # Wait for Wave 1 to complete
-            try:
-                logging.info("📝 Waiting for Intro...")
-                results['intro'] = future_intro.result()
-                logging.info("✅ Intro complete")
-            except Exception as e:
-                logging.error(f"❌ Intro failed after all retries: {e}")
-                raise
-            
-            try:
-                logging.info("🏆 Waiting for Badges...")
-                results['badges'] = future_badges.result()
-                logging.info("✅ Badges complete")
-            except Exception as e:
-                logging.error(f"❌ Badges failed after all retries: {e}")
-                raise
-            
-            # Wave 2: Guide + FAQs (parallel)
-            logging.info("\n⚡ Wave 2: Generating Guide + FAQs in parallel...")
-            
-            future_guide = executor.submit(self._generate_with_retry, self.generate_buying_guide, keyword, products)
-            future_faqs = executor.submit(self._generate_with_retry, self.generate_faqs, keyword, products)
-            
-            # Wait for Wave 2 to complete
-            try:
-                logging.info("📚 Waiting for Buying Guide...")
-                results['guide'] = future_guide.result()
-                logging.info("✅ Guide complete")
-            except Exception as e:
-                logging.error(f"❌ Guide failed after all retries: {e}")
-                raise
-            
-            try:
-                logging.info("❓ Waiting for FAQs...")
-                results['faqs'] = future_faqs.result()
-                logging.info("✅ FAQs complete")
-            except Exception as e:
-                logging.error(f"❌ FAQs failed after all retries: {e}")
-                raise
-            
-            # Wave 3: Product Reviews (3 batches parallel - max 2 at a time)
-            logging.info("\n⚡ Wave 3: Generating Product Reviews in 3 batches...")
-        
-            # Split products into 3 batches
-            batch1 = products[0:3]   # 3 products
-            batch2 = products[3:6]   # 3 products  
-            batch3 = products[6:10]  # 4 products
-            
-            # Wave 3a: Batch 1 + Batch 2 (parallel)
-            logging.info("\n  Wave 3a: Review Batch 1 (3 prods) + Batch 2 (3 prods) in parallel...")
-            
-            future_review1 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch1, keyword)
-            future_review2 = executor.submit(self._generate_with_retry, self.generate_product_reviews_batch, batch2, keyword)
-        
-        reviews_map = {}
-        
-        try:
-            logging.info("📝 Waiting for Review Batch 1...")
-            batch1_reviews = future_review1.result()
-            reviews_map.update(batch1_reviews)
-            logging.info(f"✅ Review Batch 1 complete ({len(batch1_reviews)} reviews)")
-        except Exception as e:
-            logging.error(f"❌ Review Batch 1 failed after all retries: {e}")
-            raise
-        
-        try:
-            logging.info("📝 Waiting for Review Batch 2...")
-            batch2_reviews = future_review2.result()
-            reviews_map.update(batch2_reviews)
-            logging.info(f"✅ Review Batch 2 complete ({len(batch2_reviews)} reviews)")
-        except Exception as e:
-            logging.error(f"❌ Review Batch 2 failed after all retries: {e}")
-            raise
-        
-        # Wave 3b: Batch 3 (single)
-        logging.info("\n  Wave 3b: Review Batch 3 (4 prods)...")
-        
-        try:
-            batch3_reviews = self._generate_with_retry(self.generate_product_reviews_batch, batch3, keyword)
-            reviews_map.update(batch3_reviews)
-            logging.info(f"✅ Review Batch 3 complete ({len(batch3_reviews)} reviews)")
-        except Exception as e:
-            logging.error(f"❌ Review Batch 3 failed after all retries: {e}")
-            raise
-        
-        results['reviews'] = reviews_map
-        
-        logging.info(f"\n✅ All parallel content generation complete! Total reviews: {len(reviews_map)}")
-        return results
     
     def _extract_json(self, text: str) -> str:
         """Extract JSON from AI response (handles markdown code blocks)"""
@@ -260,11 +111,11 @@ class AIContentGenerator:
         """Generate introduction paragraph (55-110 words)"""
         logging.info(f"📝 Generating introduction for: {keyword}")
         
-        # Direct instruction to output ONLY the intro
+        # Direct instruction to output ONLY the intro in plain text
         prompt = (
             f'Write a 80-word engaging introduction for a comparison article about "{keyword}". '
-            'Be conversational and trustworthy.'
-            'Output ONLY the final paragraph—no explanations, no thinking, no notes.'
+            'Be conversational and trustworthy. '
+            'Output ONLY the final paragraph in plain text—no markdown, no bold formatting, no explanations, no thinking, no notes.'
         )
         
         try:
@@ -295,8 +146,8 @@ class AIContentGenerator:
             
             intro = intro.strip()
             
-            # Bold the keyword in intro
-            intro = self._bold_keyword_in_text(intro, keyword)
+            # Remove any markdown bold formatting if present
+            intro = re.sub(r'\*\*(.+?)\*\*', r'\1', intro)
             
             word_count = len(intro.split())
             logging.info(f"✅ Introduction generated ({word_count} words)")
@@ -305,85 +156,9 @@ class AIContentGenerator:
             logging.error(f"❌ Failed to generate intro: {e}")
             raise
     
-    def generate_badges_batch(self, keyword: str, products: list, batch_name: str = "Batch") -> dict:
-        """
-        Generate badges for a batch of products (3-4 products)
-        
-        Args:
-            keyword: Search keyword
-            products: List of 3-4 products
-            batch_name: Name for logging (e.g., "Batch 1")
-            
-        Returns:
-            {
-                "badges": [
-                    {"asin": "B0XXX", "badge": "Best overall"},
-                    {"asin": "B0YYY", "badge": "Best value"}
-                ]
-            }
-        """
-        logging.info(f"🏷️ Generating badges for {batch_name}: {len(products)} products")
-        
-        # Compact product info
-        compact = []
-        all_asins = []
-        for product in products:
-            title = product['title']
-            if len(title) > 80:
-                title = title[:77] + '…'
-            
-            compact.append({
-                'asin': product['asin'],
-                'title': title,
-                'price': product['price'],
-                'brand': product.get('brand', ''),
-                'features': product['features'] if product['features'] else []
-            })
-            all_asins.append(product['asin'])
-        
-        prompt = (
-            "IMPORTANT: Output ONLY the JSON, no explanations, no thinking process.\n\n"
-            f"Create product badges for ALL {len(compact)} products in this batch.\n\n"
-            "CRITICAL REQUIREMENTS:\n"
-            "1. You MUST create a badge for EVERY SINGLE product listed below\n"
-            "2. Each badge must be a purposeful 2-3 word phrase that clearly reflects the product's unique strength, use case, or standout feature\n"
-            "3. Avoid generic labels unless they truly match the product; make badges feel human and specific\n"
-            "4. Draw inspiration from the brand, title, and feature list for each product when crafting the badge\n"
-            "5. Examples of acceptable style: \"Rain-Ready Seating\", \"Compact Bistro Choice\", \"Premium Teak Craft\"\n\n"
-            f"MANDATORY: Return badges for ALL {len(compact)} products.\n\n"
-            "JSON FORMAT (no markdown, no extra text):\n"
-            '{"badges": [{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}]}\n\n'
-            f"ALL ASINs that MUST be included:\n{', '.join(all_asins)}\n\n"
-            f"Context: {keyword}\n"
-            f"Products: {json.dumps(compact, ensure_ascii=False)}"
-        )
-        
-        response = self.client.generate(
-            prompt=prompt,
-            max_tokens=1024,
-            temperature=0.5,
-            stream=False
-        )
-        
-        logging.debug(f"📦 Raw badges response: {len(response)} chars")
-        
-        # Extract and parse JSON
-        json_text = self._extract_json(response)
-        data = json.loads(json_text)
-        
-        # Validate structure
-        if 'badges' not in data:
-            raise ValueError("Missing badges in response")
-        
-        if not isinstance(data['badges'], list):
-            raise ValueError("badges must be a list")
-        
-        logging.info(f"✅ Generated {len(data['badges'])} badges for {batch_name}")
-        return data
-    
     def generate_badges(self, keyword: str, products: list) -> dict:
         """
-        Generate badges for all products at once + select top recommendation
+        Generate badges for all products + select top recommendation
         
         Returns:
             {
@@ -409,45 +184,78 @@ class AIContentGenerator:
                 'title': title,
                 'price': product['price'],
                 'brand': product.get('brand', ''),
-                'features': product['features'][:5] if product['features'] else []
+                'features': product['features'] if product['features'] else []
             })
             all_asins.append(product['asin'])
         
         prompt = (
-            "IMPORTANT: Output ONLY the JSON, no explanations.\n\n"
-            f"Create badges for ALL {len(compact)} products + select 1 top recommendation.\n\n"
-            "REQUIREMENTS:\n"
-            "1. MUST create a badge for EVERY product\n"
-            "2. Each badge: 2-3 words reflecting unique strength\n"
-            "3. Pick ONE product as top_recommendation\n\n"
-            "JSON FORMAT:\n"
-            '{"top_recommendation": {"asin": "B0XXX"}, "badges": ['
-            '{"asin": "B0XXX", "badge": "Best overall"}, ...]}\n\n'
-            f"ALL ASINs REQUIRED: {', '.join(all_asins)}\n\n"
+            "IMPORTANT: Output ONLY the JSON, no explanations, no thinking process.\n\n"
+            "Create product badges for ALL products in the comparison article.\n\n"
+            "CRITICAL REQUIREMENTS:\n"
+            "1. You MUST create a badge for EVERY SINGLE product listed below\n"
+            "2. Each badge must be a purposeful 2-3 word phrase that clearly reflects the product's unique strength, use case, or standout feature\n"
+            "3. Avoid generic labels (e.g., 'Best overall', 'Great value') unless they truly match the product; make badges feel human and specific\n"
+            "4. Pick exactly ONE product as top recommendation (editor's choice)\n"
+            "5. Draw inspiration from the brand, title, and feature list for each product when crafting the badge\n"
+            "6. Examples of acceptable style: \"Rain-Ready Seating\", \"Compact Bistro Choice\", \"Premium Teak Craft\", \"Budget-Friendly Lounger\"\n\n"
+            f"MANDATORY: Return badges for ALL {len(compact)} products.\n\n"
+            "JSON FORMAT (no markdown, no extra text):\n"
+            '{"top_recommendation": {"asin": "ACTUAL_ASIN"}, "badges": ['
+            '{"asin": "ASIN1", "badge": "Best overall"}, {"asin": "ASIN2", "badge": "Best value"}, ...]}\n\n'
+            f"ALL ASINs that MUST be included:\n{', '.join(all_asins)}\n\n"
             f"Context: {keyword}\n"
             f"Products: {json.dumps(compact, ensure_ascii=False)}"
         )
         
-        response = self.client.generate(
-            prompt=prompt,
-            max_tokens=2048,
-            temperature=0.5,
-            stream=False
-        )
+        max_attempts = 3
+        last_error = None
         
-        # Extract and parse JSON
-        json_text = self._extract_json(response)
-        data = json.loads(json_text)
+        for attempt in range(max_attempts):
+            try:
+                logging.info(f"🔄 Badges generation attempt {attempt + 1}/{max_attempts}")
+                
+                response = self.client.generate(
+                    prompt=prompt,
+                    max_tokens=2048,
+                    temperature=0.5,
+                    stream=False
+                )
+                
+                logging.info(f"📦 Raw badges response: {len(response)} chars, preview: '{response[:100]}'")
+                
+                # Extract and parse JSON
+                json_text = self._extract_json(response)
+                logging.info(f"📦 Extracted JSON: {len(json_text)} chars, preview: '{json_text[:100]}'")
+                
+                data = json.loads(json_text)
+                
+                # Validate structure
+                if 'top_recommendation' not in data or 'badges' not in data:
+                    raise ValueError("Missing top_recommendation or badges in response")
+                
+                if not isinstance(data['badges'], list):
+                    raise ValueError("badges must be a list")
+                
+                logging.info(f"✅ Generated {len(data['badges'])} badges, top: {data['top_recommendation']['asin']}")
+                return data
+                
+            except json.JSONDecodeError as e:
+                last_error = f"JSON parse error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
+                    
+            except Exception as e:
+                last_error = f"Generation error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed")
         
-        # Validate structure
-        if 'top_recommendation' not in data or 'badges' not in data:
-            raise ValueError("Missing top_recommendation or badges in response")
-        
-        if not isinstance(data['badges'], list):
-            raise ValueError("badges must be a list")
-        
-        logging.info(f"✅ Generated {len(data['badges'])} badges, top: {data['top_recommendation']['asin']}")
-        return data
+        raise Exception(f"Failed to generate badges after {max_attempts} attempts. Last error: {last_error}")
     
     def generate_buying_guide(self, keyword: str, products: list) -> dict:
         """
@@ -488,31 +296,56 @@ class AIContentGenerator:
             f"Context: {keyword}"
         )
         
-        response = self.client.generate(
-            prompt=prompt,
-            max_tokens=2048,
-            temperature=0.5,
-            stream=False
-        )
+        max_attempts = 3
+        last_error = None
         
-        # Extract and parse JSON
-        json_text = self._extract_json(response)
-        data = json.loads(json_text)
+        for attempt in range(max_attempts):
+            try:
+                logging.info(f"🔄 Buying guide generation attempt {attempt + 1}/{max_attempts}")
+                
+                response = self.client.generate(
+                    prompt=prompt,
+                    max_tokens=2048,
+                    temperature=0.5,
+                    stream=False
+                )
+                
+                # Extract and parse JSON
+                json_text = self._extract_json(response)
+                data = json.loads(json_text)
+                
+                # Handle different response formats
+                if 'title' in data and 'sections' in data:
+                    final_data = data
+                elif isinstance(data, list) and len(data) > 0 and 'heading' in data[0]:
+                    # AI returned sections array directly
+                    final_data = {
+                        'title': f"Buying Guide: {keyword.title()}",
+                        'sections': data
+                    }
+                else:
+                    raise ValueError("Invalid buying guide schema")
+                
+                logging.info(f"✅ Generated buying guide with {len(final_data['sections'])} sections")
+                return final_data
+                
+            except json.JSONDecodeError as e:
+                last_error = f"JSON parse error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
+                    
+            except Exception as e:
+                last_error = f"Generation error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed")
         
-        # Handle different response formats
-        if 'title' in data and 'sections' in data:
-            final_data = data
-        elif isinstance(data, list) and len(data) > 0 and 'heading' in data[0]:
-            # AI returned sections array directly
-            final_data = {
-                'title': f"Buying Guide: {keyword.title()}",
-                'sections': data
-            }
-        else:
-            raise ValueError("Invalid buying guide schema")
-        
-        logging.info(f"✅ Generated buying guide with {len(final_data['sections'])} sections")
-        return final_data
+        raise Exception(f"Failed to generate buying guide after {max_attempts} attempts. Last error: {last_error}")
     
     def generate_faqs(self, keyword: str, products: list) -> list:
         """
@@ -549,29 +382,54 @@ class AIContentGenerator:
             f"Context: {keyword}"
         )
         
-        response = self.client.generate(
-            prompt=prompt,
-            max_tokens=2048,
-            temperature=0.5,
-            stream=False
-        )
+        max_attempts = 3
+        last_error = None
         
-        # Extract and parse JSON
-        json_text = self._extract_json(response)
-        faqs = json.loads(json_text)
+        for attempt in range(max_attempts):
+            try:
+                logging.info(f"🔄 FAQs generation attempt {attempt + 1}/{max_attempts}")
+                
+                response = self.client.generate(
+                    prompt=prompt,
+                    max_tokens=2048,
+                    temperature=0.5,
+                    stream=False
+                )
+                
+                # Extract and parse JSON
+                json_text = self._extract_json(response)
+                faqs = json.loads(json_text)
+                
+                # Validate structure
+                if not isinstance(faqs, list):
+                    raise ValueError("FAQs must be a list")
+                
+                if len(faqs) == 0:
+                    raise ValueError("FAQs list is empty")
+                
+                if 'question' not in faqs[0] or 'answer' not in faqs[0]:
+                    raise ValueError("Invalid FAQ schema")
+                
+                logging.info(f"✅ Generated {len(faqs)} FAQs")
+                return faqs
+                
+            except json.JSONDecodeError as e:
+                last_error = f"JSON parse error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed. Last response: {response[:500]}")
+                    
+            except Exception as e:
+                last_error = f"Generation error: {e}"
+                logging.warning(f"⚠️ Attempt {attempt + 1}/{max_attempts} - {last_error}")
+                if attempt < max_attempts - 1:
+                    logging.info(f"🔄 Retrying immediately...")
+                else:
+                    logging.error(f"❌ All attempts failed")
         
-        # Validate structure
-        if not isinstance(faqs, list):
-            raise ValueError("FAQs must be a list")
-        
-        if len(faqs) == 0:
-            raise ValueError("FAQs list is empty")
-        
-        if 'question' not in faqs[0] or 'answer' not in faqs[0]:
-            raise ValueError("Invalid FAQ schema")
-        
-        logging.info(f"✅ Generated {len(faqs)} FAQs")
-        return faqs
+        raise Exception(f"Failed to generate FAQs after {max_attempts} attempts. Last error: {last_error}")
     
     def generate_product_reviews_batch(self, products: list, keyword: str) -> dict:
         """
