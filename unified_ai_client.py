@@ -40,6 +40,15 @@ class UnifiedAIClient:
         else:
             logger.warning("✗ ChatZai API is not responding, will use Cerebras fallback")
     
+    def _parse_response(self, text: str) -> str:
+        """Parse response and remove 'Here is your answer' prefix"""
+        import re
+        # Case-insensitive search for "Here is your answer"
+        match = re.search(r'here\s+is\s+your\s+answer[:\s]*', text, re.IGNORECASE)
+        if match:
+            return text[match.end():].strip()
+        return text.strip()
+    
     def generate(self, prompt: str, system_prompt: Optional[str] = None,
                  max_tokens: int = 4000, temperature: float = 0.7, 
                  stream: bool = False, use_reasoning: bool = True, 
@@ -60,70 +69,37 @@ class UnifiedAIClient:
             str: Generated text
             
         Raises:
-            Exception: If both providers fail
+            Exception: If ChatZai fails after retries
         """
         self.stats['total_requests'] += 1
         
-        # Try ChatZai first if healthy
-        if self.chat_zai_healthy:
-            try:
-                logger.info("🌐 Using ChatZai (primary provider)")
-                response = self.chat_zai.generate(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    max_tokens=max_tokens,
-                    temperature=temperature
-                )
-                
-                # Check if JSON response is complete
-                response_stripped = response.strip()
-                if response_stripped.startswith('{') or response_stripped.startswith('['):
-                    # It's JSON, validate completeness
-                    if response_stripped.startswith('{') and not response_stripped.endswith('}'):
-                        logger.warning("⚠️ ChatZai returned incomplete JSON (missing closing brace)")
-                        raise Exception("Incomplete JSON response from ChatZai")
-                    elif response_stripped.startswith('[') and not response_stripped.endswith(']'):
-                        logger.warning("⚠️ ChatZai returned incomplete JSON (missing closing bracket)")
-                        raise Exception("Incomplete JSON response from ChatZai")
-                
-                self.stats['chat_zai_success'] += 1
-                logger.info("✓ ChatZai generation successful")
-                
-                return response
-                
-            except Exception as e:
-                logger.error(f"✗ ChatZai failed: {e}")
-                self.stats['chat_zai_failed'] += 1
-                # Mark as unhealthy for next check
-                self.chat_zai_healthy = False
-                logger.info("→ Falling back to Cerebras...")
-        else:
-            logger.info("⚠ ChatZai unhealthy, using Cerebras directly")
-        
-        # Fallback to Cerebras
+        # Use ChatZai only (with built-in 3 retries)
         try:
-            logger.info("🧠 Using Cerebras (fallback provider)")
-            # Cerebras doesn't support system_prompt parameter, merge it with prompt
-            full_prompt = prompt
-            if system_prompt:
-                full_prompt = f"{system_prompt}\n\n{prompt}"
-            
-            response = self.cerebras.generate(
-                prompt=full_prompt,
+            logger.info("🌐 Using ChatZai")
+            response = self.chat_zai.generate(
+                prompt=prompt,
+                system_prompt=system_prompt,
                 max_tokens=max_tokens,
-                temperature=temperature,
-                stream=stream,
-                use_reasoning=use_reasoning,
-                model_override=model_override
+                temperature=temperature
             )
-            self.stats['cerebras_success'] += 1
-            logger.info("✓ Cerebras generation successful")
             
-            # Try to restore ChatZai health for next request
-            self.chat_zai_healthy = self.chat_zai.health_check()
+            # Check if response is too short (likely incomplete)
+            if len(response.strip()) < 50:
+                logger.warning(f"⚠️ ChatZai returned very short response ({len(response)} chars), may be incomplete")
+                raise Exception("ChatZai response too short, likely incomplete")
+            
+            self.stats['chat_zai_success'] += 1
+            logger.info("✓ ChatZai generation successful")
+            
+            # Auto-parse <start>...</end> tags
+            response = self._parse_response(response)
             
             return response
             
+        except Exception as e:
+            logger.error(f"✗ ChatZai failed after retries: {e}")
+            self.stats['chat_zai_failed'] += 1
+            raise Exception(f"ChatZai generation failed: {e}")
         except Exception as e:
             logger.error(f"✗ Cerebras failed: {e}")
             self.stats['cerebras_failed'] += 1

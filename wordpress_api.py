@@ -119,18 +119,33 @@ class WordPressAPI:
             )
             
             if response.status_code in [200, 201]:
-                post = response.json()
+                try:
+                    post = response.json()
+                except ValueError:
+                    logging.error(f"❌ Post creation response is not JSON. Raw: {response.text[:500]}")
+                    raise
+
                 logging.info(f"✅ Post created successfully!")
-                logging.info(f"   ID: {post['id']}")
-                logging.info(f"   Status: {post['status']}")
-                logging.info(f"   URL: {post['link']}")
+                logging.debug(f"   Response keys: {list(post.keys())}")
+
+                post_id = post.get('id') or post.get('ID')
+                post_link = post.get('link') or post.get('guid', {}).get('rendered', '')
+                post_status = post.get('status', 'unknown')
+
+                if not post_id:
+                    logging.error(f"❌ Unexpected response format, missing 'id'. Raw: {post}")
+                    raise Exception("Unexpected WordPress response format (missing id)")
+
+                logging.info(f"   ID: {post_id}")
+                logging.info(f"   Status: {post_status}")
+                logging.info(f"   URL: {post_link}")
                 
                 return {
                     'success': True,
-                    'id': post['id'],
-                    'url': post['link'],
-                    'status': post['status'],
-                    'title': post['title']['rendered']
+                    'id': post_id,
+                    'url': post_link,
+                    'status': post_status,
+                    'title': post.get('title', {}).get('rendered', '') or post.get('title', {})
                 }
             else:
                 error_msg = f"Failed to create post: {response.status_code}"

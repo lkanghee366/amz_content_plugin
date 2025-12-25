@@ -17,7 +17,105 @@ class CerebrasClient:
         """Initialize Cerebras client with API keys from file"""
         self.model = model
         self.cache_file = cache_file
+        self.client = None
+        self.api_keys = []
+        self.key_index = -1  # Initialize key_index
+        self.failed_keys = set() # Initialize failed_keys
+        self._load_api_keys(api_keys_file)
+        self._initialize_client()
         
+    def _load_api_keys(self, filepath: str):
+        """Load API keys from file"""
+        try:
+            with open(filepath, 'r') as f:
+                self.api_keys = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+            if not self.api_keys:
+                raise ValueError("No API keys found in file")
+            logging.info(f"Loaded {len(self.api_keys)} Cerebras API keys")
+        except Exception as e:
+            logging.error(f"Failed to load API keys: {e}")
+            raise
+
+    def _initialize_client(self):
+        """Initialize Cerebras client with a working key"""
+        # Try cached key first
+        cached_key = self._get_cached_key()
+        if cached_key and cached_key in self.api_keys:
+            try:
+                self.client = Cerebras(api_key=cached_key)
+                logging.info(f"Initialized Cerebras client with cached key: ...{cached_key[-4:]}")
+                return
+            except Exception as e:
+                logging.warning(f"Cached key failed: {e}")
+        
+        # Rotate through keys if no cache or cache failed
+        self._rotate_key()
+
+    def _get_cached_key(self) -> str:
+        """Read last working key from cache file"""
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'r') as f:
+                    return f.read().strip()
+            except Exception:
+                pass
+        return None
+
+    def _save_cached_key(self, key: str):
+        """Save working key to cache file"""
+        try:
+            with open(self.cache_file, 'w') as f:
+                f.write(key)
+        except Exception as e:
+            logging.warning(f"Failed to save key cache: {e}")
+
+    def _rotate_key(self):
+        """Find a new working key"""
+        for key in self.api_keys:
+            try:
+                # Test key with a simple client init (SDK doesn't validate until request)
+                self.client = Cerebras(api_key=key)
+                self._save_cached_key(key)
+                logging.info(f"Rotated to new key: ...{key[-4:]}")
+                return
+            except Exception as e:
+                logging.warning(f"Key ...{key[-4:]} failed: {e}")
+        
+        raise Exception("All Cerebras API keys failed")
+
+    def generate(self, prompt: str, system_prompt: str = None, max_tokens: int = 4000, temperature: float = 0.7) -> str:
+        """
+        Generate text using Cerebras API
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if not self.client:
+                    self._initialize_client()
+                    
+                response = self.client.chat.completions.create(
+                    messages=messages,
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logging.warning(f"Cerebras generation failed (attempt {attempt+1}): {e}")
+                # If it's an auth error, rotate key
+                if "401" in str(e) or "403" in str(e) or "unauthorized" in str(e).lower():
+                    logging.info("Auth error detected, rotating key...")
+                    self._rotate_key()
+                time.sleep(1)
+        
+        raise Exception("Cerebras generation failed after retries")
+        
+
         # Load API keys
         if not os.path.exists(api_keys_file):
             raise FileNotFoundError(f"API keys file not found: {api_keys_file}")
@@ -117,7 +215,7 @@ class CerebrasClient:
         logging.error("❌ No available API keys after rotation (all tried or failed)")
         return False
     
-    def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.7, stream: bool = False, use_reasoning: bool = True, model_override: str = None) -> str:
+    def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.7, stream: bool = False, use_reasoning: bool = True, model_override: str = None, system_prompt: str = None) -> str:
         """Generate text using Cerebras AI with retry logic
         
         Args:
@@ -127,6 +225,7 @@ class CerebrasClient:
             stream: Enable streaming response
             use_reasoning: Add reasoning_effort parameter (for gpt-oss-120b)
             model_override: Override default model (e.g., 'llama-3.3-70b' for intro)
+            system_prompt: Optional system message to guide model behavior
         """
         attempts = 0
         max_attempts = len(self.api_keys) * 2
@@ -139,10 +238,16 @@ class CerebrasClient:
                 if self._real_client is None:
                     raise RuntimeError("Cerebras client not initialized")
                 
+                # Build messages array
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                
                 # Build request parameters
                 request_params = {
                     "model": model_to_use,
-                    "messages": [{"role": "user", "content": prompt}],
+                    "messages": messages,
                     "max_completion_tokens": max_tokens,
                     "temperature": temperature,
                     "stream": stream
@@ -194,7 +299,7 @@ class CerebrasClient:
                         logging.warning(f"⚠️ Empty content from response. Message object: {message}")
                         logging.warning(f"⚠️ Full response object: {response}")
                     else:
-                        logging.debug(f"📝 First 200 chars: {content[:200]}...")
+                        logging.debug(f"📝 Full content: {content}")
                     
                     # Save cache after successful generation
                     self._save_key_cache()

@@ -8,19 +8,33 @@
       "app_password": "4o7v jSjz WmAL k46P eVvX dLVG",
       "author_id": 2,
       "category_id": 20,
+      "info_category_id": null,
       "status": "publish",
       "keyword_file": "keywords/winter_product.txt"
     },
     {
-      "id": 2,
-      "name": "ProKitchenReview",
-      "site_url": "https://prokitchenreview.com",
+      "id": 6,
+      "name": "Smart Beer Zone",
+      "site_url": "https://smartbeerzone.com",
       "username": "admin",
-      "app_password": "5A03 TYh3 3BdE mKV9 pvWw zPc8",
+      "app_password": "hTTy jd5C Esg0 3o3V nGMN omlf",
       "author_id": 1,
       "category_id": 1,
+      "info_category_id": null,
       "status": "publish",
-      "keyword_file": "keywords/roaster_oven.txt"
+      "keyword_file": "keywords/coffee_kw_1.txt"
+    },
+    {
+      "id": 2,
+      "name": "Home Kitchenex",
+      "site_url": "https://homekitchenex.com",
+      "username": "admin",
+      "app_password": "0haV dqit 64fd SsB9 nKjc Ivl6",
+      "author_id": 1,
+      "category_id": 1,
+      "info_category_id": null,
+      "status": "publish",
+      "keyword_file": "keywords/coffee_kw_1.txt"
     },
     {
       "id": 3,
@@ -30,6 +44,7 @@
       "app_password": "IFJ5 sDd8 AFQe Z9cq BGmi 84bD",
       "author_id": 1,
       "category_id": 48,
+      "info_category_id": 1,
       "status": "publish",
       "keyword_file": "keywords/coffee_kw_1.txt"
     },
@@ -41,6 +56,7 @@
       "app_password": "fjEn M8r2 MhEb FOtS 3MKU HsiF",
       "author_id": 1,
       "category_id": 1,
+      "info_category_id": null,
       "status": "draft",
       "keyword_file": "keywords/roaster_oven_filtered.txt"
     },

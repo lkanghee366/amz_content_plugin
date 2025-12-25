@@ -129,10 +129,11 @@ class AmazonWPPoster:
             
             logging.info(f"✅ Found {len(products)} products")
             
-            # Step 2: Generate AI content (PARALLEL - 3 waves, max 3 concurrent)
+            # Step 2: Generate AI content (PARALLEL)
             logging.info("\n🤖 Step 2: Generating AI content in parallel...")
             
-            # Generate ALL content in parallel (Intro, Badges, Guide, FAQs, Reviews)
+            # Generate Intro, Badges, Guide, FAQs, Reviews in parallel (3 waves)
+            # Note: generate_all_content_parallel handles the 7s delay and staggered execution internally
             content = self.ai_generator.generate_all_content_parallel(keyword, products)
             
             intro = content['intro']
@@ -142,6 +143,7 @@ class AmazonWPPoster:
             reviews_map = content['reviews']
             
             logging.info(f"✅ Generated reviews for {len(reviews_map)}/{len(products)} products")
+            
             logging.info("✅ All AI content generated successfully!")
             
             # Step 3: Build HTML content
@@ -151,9 +153,9 @@ class AmazonWPPoster:
                 intro=intro,
                 products=products,
                 badges_data=badges_data,
-                reviews_map=reviews_map,
                 buying_guide=buying_guide,
-                faqs=faqs
+                faqs=faqs,
+                reviews_map=reviews_map
             )
             
             # Step 4: Post to WordPress

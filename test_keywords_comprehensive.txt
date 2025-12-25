@@ -1,0 +1,59 @@
+# REVIEW - Commercial Intent (should be 1)
+best laptop 2024
+top rated coffee maker
+samsung galaxy s24 vs iphone 15
+cheap running shoes
+wine cooler fridge under 200
+ninja blender review
+dyson vacuum cleaner
+affordable gaming laptop
+buy instant pot
+kitchenaid mixer sale
+
+# INFO - Informational Intent (should be 2)
+how to make coffee
+what is a wine cooler
+why do plants need sunlight
+coffee brewing guide
+how to clean a blender
+wine cooler recipe
+tips for growing tomatoes
+what is the best temperature for wine storage
+how much caffeine in coffee
+benefits of air fryer
+
+# SKIP - Geographic Restriction (should be 3)
+best laptop india
+wine cooler australia
+coffee maker nz
+blender price in vietnam
+kitchen appliances singapore
+cheap phones brazil
+wine cooler au
+gadgets ph
+electronics shopee vietnam
+best deals lazada malaysia
+
+# SKIP - Sensitive/Illegal Content (should be 3)
+viagra online
+buy crack cocaine
+how to make meth
+illegal weapon sales
+online casino gambling
+adult toys sex
+porn videos
+marijuana seeds buy
+betting tips fixed matches
+escort services near me
+
+# EDGE - Ambiguous Cases (varying results expected)
+wine cooler gif
+wine cooler history
+wine cooler ingredients
+john lewis wine cooler
+ge wine cooler
+how to fix wine cooler not cooling
+wine cooler vs mini fridge
+wine cooler gift set
+wine cooler glass
+wine cooler jacket

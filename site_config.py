@@ -18,6 +18,7 @@ class SiteConfig:
         self.app_password = config_dict['app_password']
         self.author_id = config_dict.get('author_id', 1)
         self.category_id = config_dict.get('category_id')
+        self.info_category_id = config_dict.get('info_category_id')
         self.status = config_dict.get('status', 'publish')
         self.keyword_file = config_dict['keyword_file']
     

@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 class ChatZaiClient:
     """Client for chat.z.ai API running on Node.js server"""
     
-    def __init__(self, api_url: str = "http://localhost:3001", timeout: int = 120, max_retries: int = 3):
+    def __init__(self, api_url: str = "http://localhost:3001", timeout: int = 180, max_retries: int = 3):
         """
         Initialize ChatZai client
         
         Args:
             api_url: Base URL of the chat.z.ai API server
-            timeout: Request timeout in seconds (default 120 for long responses)
+            timeout: Request timeout in seconds (default 180 for long JSON responses)
             max_retries: Maximum number of retry attempts
         """
         self.api_url = api_url.rstrip('/')

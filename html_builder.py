@@ -3,6 +3,7 @@ HTML Builder - Creates WordPress post content
 Mirrors the PHP plugin's HTML structure
 """
 import logging
+import re
 from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -212,4 +213,61 @@ class HTMLBuilder:
         content += HTMLBuilder.build_faqs(faqs)
         
         logging.info(f"✅ HTML content built ({len(content)} chars)")
+        return content
+
+    @staticmethod
+    def build_info_article(keyword: str, article_data: dict) -> str:
+        """
+        Build complete INFO article HTML (educational, no affiliate)
+        
+        Args:
+            keyword: Article topic
+            article_data: {
+                "intro": "...",
+                "sections": [{"heading": "...", "content": "..."}],
+                "faqs": [{"question": "...", "answer": "..."}],
+                "conclusion": "..."
+            }
+            
+        Returns:
+            Complete HTML content
+        """
+        logging.info(f"🏗️ Building INFO article HTML for: {keyword}")
+        
+        def _markdown_bold(text: str) -> str:
+            """Convert **bold** markdown to <strong> for HTML output"""
+            if not text:
+                return ""
+            return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+
+        content = ""
+
+        # Intro
+        content += f"<p>{_markdown_bold(article_data['intro'])}</p>\n\n"
+
+        # Body sections (H2 + multiple H3 subpoints)
+        for section in article_data["sections"]:
+            content += f'<h2>{section["heading"]}</h2>\n'
+            subpoints = section.get("subpoints", [])
+            for sub in subpoints:
+                content += f'<h3>{sub.get("subheading", "")}</h3>\n'
+                content += f"<p>{_markdown_bold(sub.get('content', ''))}</p>\n\n"
+
+        # FAQs section
+        content += '<h2>Frequently Asked Questions</h2>\n'
+        content += '<div class="acap-faqs">\n'
+
+        for faq in article_data["faqs"]:
+            content += '  <div class="acap-faq-item">\n'
+            content += f'    <h3 class="acap-faq-question">{faq["question"]}</h3>\n'
+            content += f"    <div class=\"acap-faq-answer\"><p>{_markdown_bold(faq['answer'])}</p></div>\n"
+            content += '  </div>\n'
+
+        content += '</div>\n\n'
+
+        # Conclusion
+        content += '<h2>Conclusion</h2>\n'
+        content += f"<p>{_markdown_bold(article_data['conclusion'])}</p>\n"
+        
+        logging.info(f"✅ INFO article HTML built ({len(content)} chars)")
         return content
