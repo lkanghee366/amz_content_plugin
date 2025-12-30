@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import logging
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -129,6 +130,32 @@ class AmazonWPPoster:
             
             logging.info(f"✅ Found {len(products)} products")
             
+            # Step 1.5: Filter relevant products using AI
+            logging.info("\n🔍 Step 1.5: Filtering relevant products using AI...")
+            relevant_indices = self.ai_generator.filter_relevant_products(keyword, products)
+            
+            if not relevant_indices:
+                logging.warning(f"⚠️ No relevant products found after AI filtering for: {keyword}")
+                return {'success': False, 'error': 'No relevant products found'}
+            
+            # Keep only relevant products
+            products = [products[i] for i in relevant_indices]
+            logging.info(f"✅ Kept {len(products)} relevant products")
+            
+            # Step 1.8: Select Category
+            logging.info("\n🗂️ Step 1.8: Selecting category...")
+            category_ids = [self.post_category_id] if self.post_category_id > 0 else None
+            
+            try:
+                # Fetch categories from WP
+                available_cats = self.wordpress.get_categories()
+                if available_cats:
+                    selected_cat_id = self.ai_generator.select_category(keyword, available_cats)
+                    if selected_cat_id > 0:
+                        category_ids = [selected_cat_id]
+            except Exception as e:
+                logging.warning(f"⚠️ Category selection failed, using default: {e}")
+            
             # Step 2: Generate AI content (PARALLEL)
             logging.info("\n🤖 Step 2: Generating AI content in parallel...")
             
@@ -141,6 +168,7 @@ class AmazonWPPoster:
             buying_guide = content['guide']
             faqs = content['faqs']
             reviews_map = content['reviews']
+            takeaways = content.get('takeaways')
             
             logging.info(f"✅ Generated reviews for {len(reviews_map)}/{len(products)} products")
             
@@ -155,7 +183,8 @@ class AmazonWPPoster:
                 badges_data=badges_data,
                 buying_guide=buying_guide,
                 faqs=faqs,
-                reviews_map=reviews_map
+                reviews_map=reviews_map,
+                takeaways=takeaways
             )
             
             # Step 4: Post to WordPress
@@ -163,7 +192,9 @@ class AmazonWPPoster:
             
             title = f"Comparison: {keyword.title()}"
             
-            category_ids = [self.post_category_id] if self.post_category_id > 0 else None
+            title = f"Comparison: {keyword.title()}"
+            
+            # category_ids is already determined above
             
             result = self.wordpress.create_post(
                 title=title,
@@ -197,12 +228,83 @@ class AmazonWPPoster:
                 'error': str(e)
             }
     
-    def process_keywords_file(self, filepath: str):
+    def process_info_keyword(self, keyword: str) -> dict:
+        """Process a single keyword for INFO article (no Amazon products)"""
+        logging.info(f"\n{'='*60}")
+        logging.info(f"📚 Processing INFO keyword: {keyword}")
+        logging.info(f"{'='*60}\n")
+        
+        try:
+            # Generate INFO article with parallel API calls
+            logging.info("🤖 Generating INFO article content (parallel mode)...")
+            article = self.ai_generator.generate_info_content_parallel(keyword)
+            
+            logging.info("✅ INFO article generated successfully!")
+            
+            # Build HTML
+            logging.info("\n🏗️ Building HTML content...")
+            html_content = HTMLBuilder.build_info_article(keyword, article)
+            
+            # Post to WordPress
+            logging.info("\n📤 Posting to WordPress...")
+            
+            # Use info_category_id if available, otherwise use regular category_id
+            default_cat_id = self.site_config.info_category_id or self.post_category_id
+            category_ids = [default_cat_id] if default_cat_id > 0 else None
+            
+            try:
+                # Fetch categories from WP
+                available_cats = self.wordpress.get_categories()
+                if available_cats:
+                    selected_cat_id = self.ai_generator.select_category(keyword, available_cats)
+                    if selected_cat_id > 0:
+                        category_ids = [selected_cat_id]
+            except Exception as e:
+                logging.warning(f"⚠️ Category selection failed, using default: {e}")
+            
+            title = keyword.title()
+            
+            result = self.wordpress.create_post(
+                title=title,
+                content=html_content,
+                status=self.post_status,
+                author_id=self.post_author_id,
+                category_ids=category_ids,
+                slug=keyword
+            )
+            
+            logging.info(f"\n{'='*60}")
+            logging.info(f"✅ SUCCESS! INFO article created for: {keyword}")
+            logging.info(f"   Post ID: {result['id']}")
+            logging.info(f"   Status: {result['status']}")
+            logging.info(f"   URL: {result['url']}")
+            logging.info(f"{'='*60}\n")
+            
+            return {
+                'success': True,
+                'keyword': keyword,
+                'post_id': result['id'],
+                'url': result['url'],
+                'status': result['status'],
+                'type': 'info'
+            }
+            
+        except Exception as e:
+            logging.error(f"\n❌ ERROR processing INFO keyword '{keyword}': {e}")
+            return {
+                'success': False,
+                'keyword': keyword,
+                'error': str(e),
+                'type': 'info'
+            }
+    
+    def process_keywords_file(self, filepath: str, limit: int = None):
         """
-        Process all keywords from a text file
+        Process all keywords from a text file with AI Auto-Classification
         
         Args:
-            filepath: Path to keywords file (one keyword per line)
+            filepath: Path to keywords file
+            limit: Optional number of articles to process
         """
         if not os.path.exists(filepath):
             logging.error(f"❌ Keywords file not found: {filepath}")
@@ -217,7 +319,10 @@ class AmazonWPPoster:
             return
         
         logging.info(f"\n📋 Found {len(keywords)} keyword(s) to process")
-        logging.info(f"⏱️ Estimated time: ~{len(keywords) * 25 / 60:.1f} minutes (no delays between posts)")
+        logging.info(f"🎯 Mode: AUTO-DETECT (AI will decide Review vs Info)")
+        
+        # Estimate time (averaged)
+        logging.info(f"⏱️ Estimated time: ~{len(keywords) * 20 / 60:.1f} minutes")
         
         # Test WordPress connection
         if not self.wordpress.test_connection():
@@ -227,12 +332,37 @@ class AmazonWPPoster:
         # Process each keyword
         results = []
         remaining_keywords = keywords.copy()
+        
+        keywords_to_process = keywords
+        if limit:
+            logging.info(f"🔢 Limiting execution to {limit} articles")
+            keywords_to_process = keywords[:limit]
+            
         consecutive_failures = 0
         
-        for idx, keyword in enumerate(keywords, 1):
-            logging.info(f"\n📊 Progress: {idx}/{len(keywords)}")
+        for idx, keyword in enumerate(keywords_to_process, 1):
+            logging.info(f"\n📊 Progress: {idx}/{len(keywords_to_process)}")
             
-            result = self.process_keyword(keyword)
+            # Step 0: Classify Keyword
+            logging.info(f"🧠 Step 0: Classifying intent for '{keyword}'...")
+            classification = self.ai_generator.classify_keyword(keyword)
+            intent = classification.get('type', 'skip')
+            
+            if intent == 'skip':
+                logging.warning(f"⏭️ Skipping keyword '{keyword}' (Classified as SKIP)")
+                results.append({'success': False, 'keyword': keyword, 'error': 'Skipped by AI'})
+                # We don't count skips as failures for stopping
+                continue
+            
+            logging.info(f"👉 Intent identified: {intent.upper()}")
+            
+            # Process based on intent
+            if intent == 'info':
+                result = self.process_info_keyword(keyword)
+            else:
+                # Default to review for 'review' or fallback
+                result = self.process_keyword(keyword)
+                
             results.append(result)
             
             # Remove keyword from file if successfully posted
@@ -274,12 +404,14 @@ class AmazonWPPoster:
         if successful:
             logging.info("\n✅ Successful posts:")
             for r in successful:
-                logging.info(f"   - {r['keyword']}: {r['url']}")
+                article_type = r.get('type', 'review').upper()
+                logging.info(f"   [{article_type}] {r['keyword']}: {r['url']}")
         
         if failed:
             logging.info("\n❌ Failed keywords:")
             for r in failed:
-                logging.info(f"   - {r['keyword']}: {r.get('error', 'Unknown error')}")
+                article_type = r.get('type', 'review').upper()
+                logging.info(f"   [{article_type}] {r['keyword']}: {r.get('error', 'Unknown error')}")
         
         logging.info(f"\n{'='*60}\n")
         
@@ -295,12 +427,39 @@ class AmazonWPPoster:
 
 def main():
     """Main entry point"""
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description='Amazon Product Comparison → WordPress Auto Poster',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Review articles (default)
+  python main.py
+  
+  # INFO/Educational articles
+  python main.py --info
+        '''
+    )
+    parser.add_argument(
+        '--info',
+        action='store_true',
+        help='Generate INFO/educational articles instead of product reviews'
+    )
+    args = parser.parse_args()
+    
+    # Determine mode
+    # mode = 'info' if args.info else 'review' # REMOVED: Auto-detect mode now
+    
     print("""
-╔═══════════════════════════════════════════════════════════╗
-║  Amazon Product Comparison → WordPress Auto Poster       ║
-║  Powered by PA-API + Cerebras AI                         ║
-╚═══════════════════════════════════════════════════════════╝
+╭───────────────────────────────────────────────────────────╮
+│  Amazon Product Comparison → WordPress Auto Poster       │
+│  Powered by PA-API + ChatZai AI                           │
+│  🤖 Mode: AUTO-DETECT (Review vs Info)                    │
+╰───────────────────────────────────────────────────────────╯
     """)
+    
+    # logging.info(f"🎯 Mode: {mode.upper()} articles\n") # REMOVED: Auto-detect
+
     
     # Check for .env file
     if not os.path.exists('.env'):
@@ -335,8 +494,19 @@ def main():
     
     logging.info(f"📄 Using keyword file: {keywords_file}")
     
+    # Ask for limit
+    print("\n" + "="*60)
+    limit_input = input("🔢 Enter number of articles to post (or press Enter for infinite): ").strip()
+    limit = None
+    if limit_input and limit_input.lower() != 'infinite':
+        try:
+            limit = int(limit_input)
+        except ValueError:
+            logging.warning("⚠️ Invalid number entered, defaulting to infinite")
+    print("="*60 + "\n")
+    
     try:
-        app.process_keywords_file(keywords_file)
+        app.process_keywords_file(keywords_file, limit=limit)
     finally:
         # Cleanup resources
         app.cleanup()

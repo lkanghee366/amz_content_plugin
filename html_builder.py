@@ -17,14 +17,53 @@ class HTMLBuilder:
         if ',' in title:
             return title.split(',')[0].strip()
         return title
+
+    @staticmethod
+    def _split_into_paragraphs(text: str, n: int = 2) -> str:
+        """Split text into paragraphs every n sentences"""
+        if not text:
+            return ""
+        
+        # Split into sentences (keeping delimiters)
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        # Group sentences
+        paragraphs = []
+        current_p = []
+        
+        for i, sentence in enumerate(sentences):
+            current_p.append(sentence)
+            if (i + 1) % n == 0:
+                paragraphs.append(' '.join(current_p))
+                current_p = []
+        
+        if current_p:
+            paragraphs.append(' '.join(current_p))
+            
+        return ''.join(f'<p>{p}</p>' for p in paragraphs)
     
     @staticmethod
     def build_intro(intro_text: str) -> str:
         """Build introduction paragraph"""
         return f'<p>{intro_text}</p>\n'
+
+    @staticmethod
+    def build_key_takeaways(takeaways: list) -> str:
+        """Build Key Takeaways summary box"""
+        if not takeaways:
+            return ""
+        
+        html = '<div class="acap-takeaways" style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0;">\n'
+        html += '  <h2 style="margin-top: 0; color: #333; font-size: 1.5rem;">Key Takeaways</h2>\n'
+        html += '  <ul style="margin-bottom: 0;">\n'
+        for item in takeaways:
+            html += f'    <li style="margin-bottom: 10px; line-height: 1.5;">{item}</li>\n'
+        html += '  </ul>\n'
+        html += '</div>\n'
+        return html
     
     @staticmethod
-    def build_editors_choice(products: list, badges_map: dict, top_asin: str) -> str:
+    def build_editors_choice(products: list, badges_map: dict, top_asin: str, reviews_map: dict = None) -> str:
         """Build Editor's Choice + Best-for section"""
         html = '<div class="acap-picks">\n'
         
@@ -52,6 +91,18 @@ class HTMLBuilder:
             if top_badge:
                 html += f'      <span class="acap-badge-inline">{top_badge}</span>\n'
             
+            # Why we choose section (derived from pros)
+            if reviews_map and top_asin in reviews_map:
+                top_pros = reviews_map[top_asin].get('pros', [])
+                if top_pros:
+                    html += '      <div class="acap-ec-why" style="margin-top: 15px; text-align: left;">\n'
+                    html += '        <span style="font-weight: bold; color: #6a11cb; display: block; margin-bottom: 5px;">Why we choose:</span>\n'
+                    html += '        <ul style="padding-left: 20px; margin: 0; font-size: 0.95rem;">\n'
+                    for pro in top_pros[:3]: # Show top 3 pros
+                        html += f'          <li>{pro}</li>\n'
+                    html += '        </ul>\n'
+                    html += '      </div>\n'
+            
             html += '    </div>\n'
             html += '  </div>\n'
         
@@ -67,8 +118,9 @@ class HTMLBuilder:
                 continue
             
             short_title = HTMLBuilder._title_before_comma(product['title'])
-            html += f'      <li><strong>Best for {badge.lower()}:</strong> '
-            html += f'<a href="{product["url"]}" target="_blank" rel="nofollow sponsored noopener" class="acap-bestfor-link">{short_title}</a></li>\n'
+            html += f'      <li><span class="acap-bestfor-label" style="font-weight: bold;">BEST FOR {badge.upper()}:</span> '
+            html += f'<a href="{product["url"]}" target="_blank" rel="nofollow sponsored noopener" class="acap-bestfor-link">{short_title}</a> '
+            html += f'<a href="#review-{asin}" class="acap-read-more" style="text-decoration: underline; border: none;">Read More &#8595;</a></li>\n'
         
         html += '    </ul>\n'
         html += '  </div>\n'
@@ -88,7 +140,7 @@ class HTMLBuilder:
             badge = badges_map.get(asin, '')
             review = reviews_map.get(asin) if reviews_map else None
             
-            html += '    <div class="acap-box">\n'
+            html += f'    <div class="acap-box" id="review-{asin}">\n'
             
             if badge:
                 html += f'      <div class="acap-badge">{badge}</div>\n'
@@ -106,7 +158,8 @@ class HTMLBuilder:
             
             # Product Description (if review available)
             if review and review.get('description'):
-                html += f'      <div class="acap-description">{review["description"]}</div>\n'
+                desc_html = HTMLBuilder._split_into_paragraphs(review["description"])
+                html += f'      <div class="acap-description">{desc_html}</div>\n'
             
             # Pros & Cons (side by side)
             if review:
@@ -188,16 +241,17 @@ class HTMLBuilder:
     
     @staticmethod
     def build_full_post(keyword: str, intro: str, products: list, badges_data: dict, 
-                       buying_guide: dict, faqs: list, reviews_map: dict = None) -> str:
+                       buying_guide: dict, faqs: list, reviews_map: dict = None, takeaways: list = None) -> str:
         """
         Build complete post content
         
         Structure:
         1. Introduction
-        2. Editor's Choice + Best-for
-        3. Product Cards (with reviews if available)
-        4. Buying Guide
-        5. FAQs
+        2. Key Takeaways (optional)
+        3. Editor's Choice + Best-for
+        4. Product Cards (with reviews if available)
+        5. Buying Guide
+        6. FAQs
         """
         logging.info(f"🏗️ Building HTML content for: {keyword}")
         
@@ -207,7 +261,11 @@ class HTMLBuilder:
         
         content = ""
         content += HTMLBuilder.build_intro(intro)
-        content += HTMLBuilder.build_editors_choice(products, badges_map, top_asin)
+        
+        if takeaways:
+            content += HTMLBuilder.build_key_takeaways(takeaways)
+            
+        content += HTMLBuilder.build_editors_choice(products, badges_map, top_asin, reviews_map)
         content += HTMLBuilder.build_product_cards(keyword, products, badges_map, reviews_map)
         content += HTMLBuilder.build_buying_guide(buying_guide)
         content += HTMLBuilder.build_faqs(faqs)
@@ -240,10 +298,24 @@ class HTMLBuilder:
                 return ""
             return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
 
+        def _paragraphs_html(text: str) -> str:
+            """Convert a text blob into one-or-more <p> blocks.
+
+            If the text already contains <p> tags, return as-is.
+            Otherwise split on blank lines.
+            """
+            if not text:
+                return ""
+            if '<p>' in text.lower():
+                return text
+
+            chunks = [chunk.strip() for chunk in re.split(r'\n\s*\n+', text.strip()) if chunk.strip()]
+            return "\n".join(f"<p>{chunk}</p>" for chunk in chunks)
+
         content = ""
 
         # Intro
-        content += f"<p>{_markdown_bold(article_data['intro'])}</p>\n\n"
+        content += _paragraphs_html(_markdown_bold(article_data['intro'])) + "\n\n"
 
         # Body sections (H2 + multiple H3 subpoints)
         for section in article_data["sections"]:
@@ -251,7 +323,7 @@ class HTMLBuilder:
             subpoints = section.get("subpoints", [])
             for sub in subpoints:
                 content += f'<h3>{sub.get("subheading", "")}</h3>\n'
-                content += f"<p>{_markdown_bold(sub.get('content', ''))}</p>\n\n"
+                content += _paragraphs_html(_markdown_bold(sub.get('content', ''))) + "\n\n"
 
         # FAQs section
         content += '<h2>Frequently Asked Questions</h2>\n'
@@ -260,14 +332,14 @@ class HTMLBuilder:
         for faq in article_data["faqs"]:
             content += '  <div class="acap-faq-item">\n'
             content += f'    <h3 class="acap-faq-question">{faq["question"]}</h3>\n'
-            content += f"    <div class=\"acap-faq-answer\"><p>{_markdown_bold(faq['answer'])}</p></div>\n"
+            content += f"    <div class=\"acap-faq-answer\">{_paragraphs_html(_markdown_bold(faq['answer']))}</div>\n"
             content += '  </div>\n'
 
         content += '</div>\n\n'
 
         # Conclusion
         content += '<h2>Conclusion</h2>\n'
-        content += f"<p>{_markdown_bold(article_data['conclusion'])}</p>\n"
+        content += _paragraphs_html(_markdown_bold(article_data['conclusion'])) + "\n"
         
         logging.info(f"✅ INFO article HTML built ({len(content)} chars)")
         return content

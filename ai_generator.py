@@ -19,6 +19,58 @@ class AIContentGenerator:
         self.client = ai_client
         self.max_retries = 3
 
+    def select_category(self, keyword: str, categories: list) -> int:
+        """
+        Select the most best WordPress category for the keyword.
+        Always returns a category ID, even if loose match.
+        """
+        if not categories:
+            return 0
+            
+        logging.info(f"🗂️ Selecting category for: {keyword}")
+        
+        # Format categories for prompt
+        cats_text = "\n".join([f"{c['id']}: {c['name']}" for c in categories])
+        
+        prompt = (
+            f"Select the single best category ID for an article about '{keyword}'.\n"
+            f"Available Categories (ID: Name):\n{cats_text}\n\n"
+            "Requirements:\n"
+            "1. Output ONLY the ID number (e.g. 15). No text, no explanation.\n"
+            "2. You MUST pick one. If no perfect match, pick the closest or most generic relevant one.\n"
+            "3. Do not create new categories, only pick from the list.\n"
+            "4. Start your response with 'Here is your answer:' followed by the ID number.\n"
+            "5. Do NOT output a list like [0, 1...]. Just ONE single number."
+        )
+        
+        try:
+            # Use fast model for simple classification
+            response = self.client.generate(
+                prompt=prompt,
+                max_tokens=50,
+                temperature=0.1,
+                model_override='zai-glm-4.6',
+                min_length=1
+            )
+            
+            # Extract all numbers from response
+            found_ids = [int(num) for num in re.findall(r'\b(\d+)\b', response)]
+            
+            # Find the first one that is a valid category ID
+            for cat_id in found_ids:
+                cat_name = next((c['name'] for c in categories if c['id'] == cat_id), None)
+                if cat_name:
+                    logging.info(f"✅ AI selected category: [{cat_id}] {cat_name}")
+                    return cat_id
+            
+            logging.warning(f"⚠️ Could not parse valid category ID from: {response}")
+            return 0
+            
+        except Exception as e:
+            logging.error(f"❌ Category selection failed: {e}")
+            return 0
+
+
     def classify_keyword(self, keyword: str) -> dict:
         """
         Classify keyword intent:
@@ -47,7 +99,8 @@ class AIContentGenerator:
                 max_tokens=1000,
                 temperature=0.5,
                 model_override='zai-glm-4.6',
-                system_prompt="You are a classifier. Output ONLY the number 1, 2, or 3. No explanation, no reasoning, just the number."
+                system_prompt="You are a classifier. Output ONLY the number 1, 2, or 3. No explanation, no reasoning, just the number.",
+                min_length=1
             )
             
             # Extract number from response
@@ -74,6 +127,59 @@ class AIContentGenerator:
         except Exception as e:
             logging.error(f"❌ Classification failed: {e}")
             return {"type": "skip"}
+
+    def filter_relevant_products(self, keyword: str, products: list) -> list:
+        """
+        Analyze products and filter out irrelevant ones (accessories, parts, etc.)
+        Returns list of relevant product indices.
+        """
+        if not products:
+            return []
+            
+        logging.info(f"🔍 AI Filtering products for: {keyword}")
+        
+        # Build product list for AI
+        titles = []
+        for i, p in enumerate(products):
+            title = p['title'][:120] + "..." if len(p['title']) > 120 else p['title']
+            titles.append(f"{i}. {title}")
+        
+        titles_text = "\n".join(titles)
+        
+        prompt = (
+            f"Analyze these {len(products)} search results for the keyword: '{keyword}'.\n"
+            "Identify which products are actual MAIN products and which are secondary accessories, parts, or unrelated.\n\n"
+            f"Products:\n{titles_text}\n\n"
+            "Requirements:\n"
+            "1. Output ONLY a valid JSON array of indices (e.g. [0, 1, 4..]) of the relevant MAIN products.\n"
+            "2. EXCLUDE: replacement filters, covers, cleaning kits, bags, or individual parts if the keyword asks for the machine itself.\n"
+            "3. Start your response with 'Here is your answer:' followed by the JSON array.\n"
+            "4. No markdown, no explanations."
+        )
+        
+        try:
+            response = self.client.generate(
+                prompt=prompt,
+                max_tokens=256,
+                temperature=0.1,
+                model_override='zai-glm-4.6', # Fast and good at JSON/extraction
+                min_length=2 # JSON array is short "[]"
+            )
+            
+            json_text = self._extract_json(response)
+            indices = json.loads(json_text)
+            
+            if isinstance(indices, list):
+                # Filter indices to ensure they are valid
+                valid_indices = [i for i in indices if isinstance(i, int) and 0 <= i < len(products)]
+                logging.info(f"✅ Filtered products: {len(valid_indices)}/{len(products)} relevant")
+                return valid_indices
+            else:
+                raise ValueError("AI did not return a list")
+                
+        except Exception as e:
+            logging.error(f"❌ Product filtering failed: {e}. Using all products as fallback.")
+            return list(range(len(products)))
 
     def _generate_with_retry(self, func, *args, **kwargs):
         """
@@ -134,17 +240,37 @@ class AIContentGenerator:
         return text
 
     def _clean_intro(self, text: str) -> str:
-        """Return a single clean paragraph from the model output"""
+        """Return a single clean paragraph from the model output, handling potential JSON leaks."""
         if not text:
             return ""
+
+        text = text.strip()
+
+        # Phase 1: Robust JSON handling
+        # If the text looks like JSON, try to extract the content field
+        if text.startswith('{') or '"intro"' in text.lower() or '"content"' in text.lower():
+            try:
+                json_text = self._extract_json(text)
+                data = json.loads(json_text)
+                if isinstance(data, dict):
+                    # Look for common content keys
+                    for key in ['intro', 'content', 'text', 'answer', 'paragraph', 'description']:
+                        if key in data and isinstance(data[key], str) and len(data[key].split()) > 20:
+                            text = data[key]
+                            break
+            except:
+                pass # Fall back to regex cleaning if JSON parsing fails
 
         def is_instruction(segment: str) -> bool:
             lower = segment.lower()
             instruction_tokens = (
-                "we need", "let's", "lets", "count", "ensure word count",
+                "we need", "let's", "lets", "word count", "character count",
                 "i will", "draft", "plan", "outline", "analysis", "approach",
                 "step", "goal", "objective", "strategy"
             )
+            # Check if segment looks like a JSON key (e.g. "intro":)
+            if re.search(r'^\s*["\']?\w+["\']?\s*:', segment):
+                return True
             return any(token in lower for token in instruction_tokens)
 
         text = text.strip()
@@ -157,22 +283,29 @@ class AIContentGenerator:
 
         seen = set()
         for cand in candidates:
-            normalized = re.sub(r'\s+', ' ', cand.strip('"“”'))
+            # Clean up potential leading/trailing JSON debris
+            normalized = cand.strip('"“” ,:{}[]')
+            normalized = re.sub(r'\s+', ' ', normalized)
+            
             if not normalized or normalized in seen:
                 continue
             seen.add(normalized)
             word_count = len(re.findall(r'\w+', normalized))
-            if 40 <= word_count <= 140 and not is_instruction(normalized):
-                return normalized
+            
+            # More specific validation for valid content
+            if 40 <= word_count <= 150 and not is_instruction(normalized):
+                # Ensure it doesn't end with a colon (often indicates meta-text)
+                if not normalized.endswith(':'):
+                    return normalized
 
         # Fallback: remove instruction-like sentences and join the rest
         sentences = re.split(r'(?<=[.!?])\s+', text)
         filtered = [s for s in sentences if s and not is_instruction(s)]
-        fallback = ' '.join(filtered).strip('"“” ')
+        fallback = ' '.join(filtered).strip('"“” :{}[]')
         if fallback:
             return re.sub(r'\s+', ' ', fallback)
 
-        return re.sub(r'\s+', ' ', text.strip('""" '))
+        return re.sub(r'\s+', ' ', text.strip('""" {}[]'))
     
     def _bold_keyword_in_text(self, text: str, keyword: str) -> str:
         """
@@ -743,6 +876,56 @@ class AIContentGenerator:
             "cons": ["Price may vary", "Limited availability"]
         }
 
+    def generate_key_takeaways(self, keyword: str, badges_data: dict, reviews_map: dict) -> list:
+        """
+        Generate 3-5 key takeaways based on the generated content.
+        Typically includes the top recommendation and general buying advice.
+        """
+        logging.info(f"📝 Generating key takeaways for: {keyword}")
+        
+        top_asin = badges_data.get('top_recommendation', {}).get('asin')
+        top_review = reviews_map.get(top_asin, {})
+        top_pros = ", ".join(top_review.get('pros', []))
+        
+        prompt = (
+            f"Based on a comparison of products for '{keyword}', generate 3-5 concise, high-value 'Key Takeaways'.\n\n"
+            f"Context:\n"
+            f"- Topic: {keyword}\n"
+            f"- Editor's Choice Product Pros: {top_pros}\n\n"
+            "Requirements:\n"
+            "1. Output ONLY a valid JSON array of strings (e.g. [\"Point 1\", \"Point 2\"]).\n"
+            "2. Each takeaway should be one clear sentence (max 20 words).\n"
+            "3. Mention the primary strength of the top recommendation.\n"
+            "4. Provide general advice for choosing the right product in this category.\n"
+            "5. Start your response with 'Here is your answer:' followed by the JSON array.\n"
+            "6. No markdown, no extra text."
+        )
+        
+        try:
+            response = self.client.generate(
+                prompt=prompt,
+                max_tokens=512,
+                temperature=0.5,
+                model_override='zai-glm-4.6' # Fast and good at JSON
+            )
+            
+            json_text = self._extract_json(response)
+            takeaways = json.loads(json_text)
+            
+            if isinstance(takeaways, list):
+                logging.info(f"✅ Generated {len(takeaways)} key takeaways")
+                return takeaways
+            else:
+                raise ValueError("AI did not return a list")
+        except Exception as e:
+            logging.error(f"❌ Failed to generate key takeaways: {e}")
+            # Fallback
+            return [
+                f"Consider specific features and build quality when selecting {keyword}.",
+                "Our top recommendation offers the best overall performance for most users.",
+                "Review the pros and cons to ensure the product meets your specific requirements."
+            ]
+
     def generate_all_content_parallel(self, keyword: str, products: list) -> dict:
         """
         Generate all content sections with controlled concurrency (max 3 concurrent requests)
@@ -769,10 +952,19 @@ class AIContentGenerator:
         Raises:
             Exception: If any section fails after retries
         """
-        logging.info("🚀 Starting parallel content generation (max 3 concurrent, 2 products/batch, 1s delay)...")
-        
+        logging.info("🚀 Starting content generation (Intro first, then parallel blocks)...")
+    
         results = {}
-        
+    
+        # Step 1: Generate Intro sequentially first (ensure no overlap/conflict)
+        try:
+            results['intro'] = self._generate_with_retry(self.generate_intro, keyword)
+            logging.info("✅ Intro generated sequentially")
+        except Exception as e:
+            logging.error(f"❌ Failed to generate intro sequentially: {e}")
+            raise
+
+        # Step 2: Prepare the rest of the tasks for parallel execution
         # Split products into batches of 2
         batch_size = 2
         review_batches = []
@@ -782,9 +974,8 @@ class AIContentGenerator:
         
         logging.info(f"📦 Created {len(review_batches)} review batches (2 products each)")
         
-        # Prepare all tasks as (name, function, args)
+        # Prepare tasks (excluding intro as it's already done)
         tasks = [
-            ('intro', self.generate_intro, (keyword,)),
             ('badges', self.generate_badges, (keyword, products)),
             ('guide', self.generate_buying_guide, (keyword, products)),
             ('faqs', self.generate_faqs, (keyword, products))
@@ -794,21 +985,23 @@ class AIContentGenerator:
         for idx, batch in enumerate(review_batches, 1):
             tasks.append((f'review_batch_{idx}', self.generate_product_reviews_batch, (batch, keyword)))
         
-        logging.info(f"📋 Total tasks: {len(tasks)} (4 content + {len(review_batches)} review batches)")
+        logging.info(f"📋 Total parallel tasks: {len(tasks)} (3 content + {len(review_batches)} review batches)")
         
         from concurrent.futures import as_completed
+        from concurrent.futures import ThreadPoolExecutor
+        import time
         
         with ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit all tasks (executor will queue them automatically)
+            # Submit remaining tasks
             futures = {}
             for name, func, args in tasks:
                 future = executor.submit(self._generate_with_retry, func, *args)
                 futures[future] = name
                 logging.info(f"📤 Submitted: {name}")
             
-            logging.info(f"✅ All {len(tasks)} tasks submitted! Max 3 running concurrently...")
+            logging.info(f"✅ All {len(tasks)} parallel tasks submitted! Max 3 running concurrently...")
             
-            # Collect results as they complete (in any order)
+            # Collect results
             reviews_map = {}
             completed_count = 0
             
@@ -820,21 +1013,18 @@ class AIContentGenerator:
                     result = future.result()
                     
                     # Store result based on task name
-                    if name == 'intro':
-                        results['intro'] = result
-                    elif name == 'badges':
+                    if name == 'badges':
                         results['badges'] = result
                     elif name == 'guide':
                         results['guide'] = result
                     elif name == 'faqs':
                         results['faqs'] = result
                     elif name.startswith('review_batch_'):
-                        # Merge review results
                         reviews_map.update(result)
                     
                     logging.info(f"✅ {name} complete ({completed_count}/{len(tasks)})")
                     
-                    # Wait 1s after each completion (except last one)
+                    # Wait 1s after each completion
                     if completed_count < len(tasks):
                         logging.info("⏳ Waiting 1s before next task...")
                         time.sleep(1)
@@ -845,7 +1035,20 @@ class AIContentGenerator:
             
             results['reviews'] = reviews_map
         
-        logging.info(f"\n✅ All parallel content generation complete! Total reviews: {len(reviews_map)}")
+        # Step 3: Generate Key Takeaways sequentially (using results from Step 2)
+        try:
+            results['takeaways'] = self._generate_with_retry(
+                self.generate_key_takeaways, 
+                keyword, 
+                results['badges'], 
+                results['reviews']
+            )
+            logging.info("✅ Key takeaways generated sequentially")
+        except Exception as e:
+            logging.warning(f"⚠️ Failed to generate key takeaways: {e}")
+            results['takeaways'] = []
+
+        logging.info(f"\n✅ All content generation complete! Total reviews: {len(reviews_map)}")
         return results
 
     def generate_info_article(self, keyword: str) -> dict:
@@ -853,7 +1056,7 @@ class AIContentGenerator:
         Generate informational/educational article (no affiliate links)
         
         Structure:
-        - Intro (educational tone)
+        - Intro (seo friendly, engaging)
         - Body sections (4-6 H2 with educational content)
         - FAQs
         - Conclusion (educational summary)
@@ -865,7 +1068,7 @@ class AIContentGenerator:
             {
                 "intro": "Educational intro paragraph...",
                 "sections": [
-                    {"heading": "Understanding the Basics", "content": "Paragraph content..."},
+                    {"heading": "", "content": "Paragraph content..."},
                     {"heading": "Step-by-Step Process", "content": "Paragraph content..."}
                 ],
                 "faqs": [
@@ -900,7 +1103,7 @@ class AIContentGenerator:
         # Generate body sections
         logging.info("📝 Generating body sections...")
         sections_prompt = (
-            f"Create 4-6 educational sections about '{keyword}'.\n"
+            f"Create 4-6 seo friendly and answer the questions about '{keyword}'.\n"
             "Start your response with 'Here is your answer:' followed by the JSON only. No markdown, no extra text.\n\n"
             '[{"heading": "Understanding the Basics", "subpoints": [{"subheading": "Core principles", "content": "Educational paragraph..."}, {"subheading": "Key terms", "content": "Educational paragraph..."}]}, '
             '{"heading": "Key Techniques", "subpoints": [{"subheading": "Practical steps", "content": "Educational paragraph..."}, {"subheading": "Tips", "content": "Educational paragraph..."}]}]\n\n'
@@ -972,6 +1175,359 @@ class AIContentGenerator:
         
         logging.info("✅ INFO article generation complete!")
         return result
+
+    # ==================== INFO ARTICLE PARALLEL GENERATION ====================
+    
+    def generate_info_outline(self, keyword: str) -> dict:
+        """
+        Step 1: Generate article outline structure
+        Model automatically creates 7 relevant H2 sections with H3 subheadings
+        
+        Returns:
+            {
+                "sections": [
+                    {"h2": "Section Title", "h3_list": ["Sub 1", "Sub 2", "Sub 3"]},
+                    ...7 sections total
+                ]
+            }
+        """
+        logging.info(f"📋 Generating outline for: {keyword}")
+        
+        prompt = (
+            f"Create a comprehensive outline for a 3000-word SEO-friendly article that answers the search query: '{keyword}'.\n\n"
+            "Start your response with 'Here is your answer:' followed by the JSON only.\n\n"
+            "Generate exactly 7 SEO-friendly main H2 sections with 2-4 H3 subheadings each.\n"
+            "CRITICAL SEO/INTENT RULES:\n"
+            "- The reader clicked because they want the answer to the keyword query.\n"
+            "- H2 #1 or H2 #2 MUST directly answer the keyword (the main question).\n"
+            "- Include the keyword phrase (or a very close paraphrase) in H2 #1 or H2 #2.\n"
+            "- Avoid academic/generic headings like 'Understanding', 'Basics', 'Overview', 'Introduction'.\n"
+            "- Prefer headings phrased as questions or solution-focused topics (practical + useful).\n"
+            "Choose section topics that comprehensively solve the user's intent.\n\n"
+            "Return JSON array format:\n"
+            '[{"h2": "Section Title", "h3_list": ["Subheading 1", "Subheading 2", "Subheading 3"]}, ...]\n\n'
+            f"Topic: {keyword}\n"
+            "Return ONLY the JSON array, no extra text or explanations."
+        )
+        
+        sections = self._generate_with_retry(
+            self._generate_json_content,
+            prompt,
+            max_tokens=1024,
+            temperature=0.4
+        )
+        
+        if len(sections) != 7:
+            logging.warning(f"⚠️ Expected 7 sections, got {len(sections)}. Adjusting...")
+        
+        logging.info(f"✅ Outline generated: {len(sections)} sections")
+        for idx, sec in enumerate(sections, 1):
+            logging.info(f"   {idx}. {sec['h2']} ({len(sec['h3_list'])} H3s)")
+        
+        return {"sections": sections}
+    
+    def _split_into_paragraphs(self, content: str, target_words: int = 40) -> str:
+        """
+        Split content into paragraphs of ~target_words each
+        Splits at sentence boundaries (periods) to maintain readability
+        
+        Args:
+            content: Raw text content
+            target_words: Target words per paragraph (default 100)
+            
+        Returns:
+            Content split into paragraphs separated by blank lines (no HTML tags)
+        """
+        import re
+
+        text = (content or "").strip()
+        if not text:
+            return ""
+
+        # Split by sentence boundaries. Do not require uppercase (can be lowercase, quotes, etc.)
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        paragraphs = []
+        current_para = []
+        current_word_count = 0
+        
+        for sentence in sentences:
+            sentence_words = len(sentence.split())
+            
+            # If adding this sentence keeps us under target + 10 words, add it
+            if current_word_count + sentence_words <= target_words + 10:
+                current_para.append(sentence)
+                current_word_count += sentence_words
+            else:
+                # Start new paragraph
+                if current_para:
+                    paragraphs.append(' '.join(current_para))
+                current_para = [sentence]
+                current_word_count = sentence_words
+        
+        # Add remaining sentences
+        if current_para:
+            paragraphs.append(' '.join(current_para))
+        
+        # Return as plain paragraphs separated by blank lines
+        return '\n\n'.join(paragraphs)
+    
+    def generate_info_intro(self, keyword: str) -> str:
+        """Generate intro paragraph (80 words)"""
+        logging.info("📝 Generating intro...")
+        
+        prompt = (
+            f'Write an 80-word engaging introduction that addresses the search query "{keyword}". '
+            'Be conversational, helpful, and solution-focused. '
+            'Make it clear the article will answer the keyword question quickly. '
+            'Start your response with "Here is your answer:" followed by the paragraph. '
+            'No markdown, no bold formatting, no extra explanations.'
+        )
+        
+        intro = self.client.generate(
+            prompt=prompt,
+            max_tokens=512,
+            temperature=0.2,
+            stream=True,
+            model_override='qwen-3-235b-a22b-instruct-2507'
+        )
+        
+        intro = self._clean_intro(intro)
+        intro = re.sub(r'\*\*(.+?)\*\*', r'\1', intro)
+        
+        logging.info(f"✅ Intro: {len(intro.split())} words")
+        return intro
+    
+    def generate_info_section_content(self, keyword: str, section: dict) -> dict:
+        """
+        Generate content for one H2 section with H3 subheadings
+        Target: 300-500 words total for the section
+        
+        Args:
+            section: {"h2": "Title", "h3_list": ["Sub1", "Sub2", "Sub3"]}
+            
+        Returns:
+            {
+                "heading": "H2 Title",
+                "subpoints": [
+                    {"subheading": "Sub1", "content": "Paragraph..."},
+                    {"subheading": "Sub2", "content": "Paragraph..."}
+                ]
+            }
+        """
+        h2_title = section['h2']
+        h3_list = section['h3_list']
+        
+        logging.info(f"📝 Generating section: {h2_title} ({len(h3_list)} H3s)")
+        
+        words_per_h3 = max(80, 400 // len(h3_list))  # Distribute 400 words across H3s
+        
+        prompt = (
+            f"Write helpful, solution-focused content for the section '{h2_title}' that answers the query '{keyword}'.\n\n"
+            "Start your response with 'Here is your answer:' followed by the JSON only.\n\n"
+            f"Create content for these subheadings: {h3_list}\n\n"
+            "Format:\n"
+            '[\n'
+            '  {"subheading": "First H3", "content": "Actionable paragraph with **bold key points**..."},\n'
+            '  {"subheading": "Second H3", "content": "Actionable paragraph with **bold key points**..."}\n'
+            ']\n\n'
+            "Requirements:\n"
+            f"- Each H3 content: {words_per_h3}-{words_per_h3+50} words\n"
+            "- Include 1-2 **bold key terms** using markdown in each paragraph\n"
+            "- Conversational, practical tone (avoid academic language)\n"
+            "- Focus on giving the reader a useful answer\n"
+            "- Target 300-500 words total for entire section\n\n"
+            f"Topic: {keyword}\n"
+            f"Section: {h2_title}"
+        )
+        
+        subpoints = self._generate_with_retry(
+            self._generate_json_content,
+            prompt,
+            max_tokens=2048,
+            temperature=0.6
+        )
+        
+        # Split each subpoint content into ~40 word paragraphs
+        for subpoint in subpoints:
+            subpoint['content'] = self._split_into_paragraphs(subpoint['content'], target_words=40)
+        
+        total_words = sum(len(sp['content'].split()) for sp in subpoints)
+        logging.info(f"✅ {h2_title}: {total_words} words ({len(subpoints)} H3s, split into ~40w paragraphs)")
+        
+        return {
+            "heading": h2_title,
+            "subpoints": subpoints
+        }
+    
+    def generate_info_faqs(self, keyword: str) -> list:
+        """Generate 5-8 FAQs"""
+        logging.info("❓ Generating FAQs...")
+        
+        prompt = (
+            f"Create 5-8 helpful FAQs that directly address the search query '{keyword}' and closely related questions.\n"
+            "Start your response with 'Here is your answer:' followed by the JSON array only.\n\n"
+            '[{"question": "What is...?", "answer": "Educational answer in 2-3 sentences..."}, '
+            '{"question": "How do I...?", "answer": "Practical guidance..."}]\n\n'
+            "Requirements:\n"
+            "- Common questions people ask after searching this keyword\n"
+            "- Clear, helpful answers (2-4 sentences each), give specific guidance\n"
+            "- No product recommendations\n\n"
+            f"Topic: {keyword}"
+        )
+        
+        faqs = self._generate_with_retry(
+            self._generate_json_content,
+            prompt,
+            max_tokens=2048,
+            temperature=0.5
+        )
+        
+        logging.info(f"✅ FAQs: {len(faqs)} questions")
+        return faqs
+    
+    def generate_info_conclusion(self, keyword: str) -> str:
+        """Generate conclusion paragraph (60-80 words)"""
+        logging.info("📝 Generating conclusion...")
+        
+        prompt = (
+            f'Write a 60-80 word conclusion for the article about "{keyword}". '
+            'Summarize key takeaways and encourage readers. '
+            'Start your response with "Here is your answer:" followed by the paragraph. '
+            'No markdown, no extra explanations.'
+        )
+        
+        conclusion = self.client.generate(
+            prompt=prompt,
+            max_tokens=512,
+            temperature=0.2,
+            stream=True,
+            model_override='qwen-3-235b-a22b-instruct-2507'
+        )
+        
+        conclusion = self._clean_intro(conclusion)
+        conclusion = re.sub(r'\*\*(.+?)\*\*', r'\1', conclusion)
+        
+        logging.info(f"✅ Conclusion: {len(conclusion.split())} words")
+        return conclusion
+    
+    def generate_info_content_parallel(self, keyword: str) -> dict:
+        """
+        Generate INFO article with parallel API calls
+        
+        Workflow:
+        1. Generate outline (1 API) - Model creates 7 H2 sections
+        2. Parallel content generation (max 3 concurrent):
+           - intro
+           - section 1 content (H2 + H3s, 300-500 words)
+           - section 2 content
+           - section 3 content
+           - section 4 content
+           - section 5 content
+           - section 6 content
+           - section 7 content
+           - faqs
+           - conclusion
+        
+        Total: 1 + 10 API calls (10 parallel tasks with max 3 concurrent)
+        Content auto-split into ~40 word paragraphs
+        
+        Returns:
+            {
+                "intro": "...",
+                "sections": [
+                    {"heading": "H2", "subpoints": [{"subheading": "H3", "content": "<p>...</p>"}]}
+                ],
+                "faqs": [...],
+                "conclusion": "..."
+            }
+        """
+        logging.info(f"🚀 Starting INFO article generation for: {keyword}")
+        
+        # Step 1: Generate outline (sequential - needed for next steps)
+        outline = self.generate_info_outline(keyword)
+        sections_outline = outline['sections']
+        
+        logging.info(f"\n📦 Preparing {len(sections_outline) + 3} parallel tasks...")
+        logging.info("   1. Intro")
+        for idx, sec in enumerate(sections_outline, 2):
+            logging.info(f"   {idx}. Section: {sec['h2']}")
+        logging.info(f"   {len(sections_outline) + 2}. FAQs")
+        logging.info(f"   {len(sections_outline) + 3}. Conclusion")
+        
+        # Step 2: Prepare parallel tasks
+        tasks = [
+            ('intro', self.generate_info_intro, (keyword,)),
+            ('faqs', self.generate_info_faqs, (keyword,)),
+            ('conclusion', self.generate_info_conclusion, (keyword,))
+        ]
+        
+        # Add section tasks
+        for idx, section in enumerate(sections_outline, 1):
+            tasks.append((f'section_{idx}', self.generate_info_section_content, (keyword, section)))
+        
+        logging.info(f"\n🚀 Starting parallel generation (max 3 concurrent, {len(tasks)} total tasks)...")
+        
+        from concurrent.futures import as_completed
+        
+        results = {}
+        sections_content = {}
+        
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit all tasks
+            futures = {}
+            for name, func, args in tasks:
+                future = executor.submit(self._generate_with_retry, func, *args)
+                futures[future] = name
+                logging.info(f"📤 Submitted: {name}")
+            
+            logging.info(f"✅ All {len(tasks)} tasks submitted!\n")
+            
+            # Collect results as they complete
+            completed_count = 0
+            
+            for future in as_completed(futures):
+                name = futures[future]
+                completed_count += 1
+                
+                try:
+                    result = future.result()
+                    
+                    # Store results
+                    if name == 'intro':
+                        results['intro'] = result
+                    elif name == 'faqs':
+                        results['faqs'] = result
+                    elif name == 'conclusion':
+                        results['conclusion'] = result
+                    elif name.startswith('section_'):
+                        section_num = int(name.split('_')[1])
+                        sections_content[section_num] = result
+                    
+                    logging.info(f"✅ {name} complete ({completed_count}/{len(tasks)})")
+                    
+                    # Wait 1s after each completion (except last)
+                    if completed_count < len(tasks):
+                        logging.info("⏳ Waiting 1s...")
+                        time.sleep(1)
+                    
+                except Exception as e:
+                    logging.error(f"❌ {name} failed: {e}")
+                    raise
+        
+        # Assemble sections in order
+        results['sections'] = [sections_content[i] for i in sorted(sections_content.keys())]
+        
+        logging.info(f"\n✅ INFO article generation complete!")
+        logging.info(f"   Intro: {len(results['intro'].split())} words")
+        logging.info(f"   Sections: {len(results['sections'])}")
+        for sec in results['sections']:
+            total_words = sum(len(sp['content'].split()) for sp in sec['subpoints'])
+            logging.info(f"      - {sec['heading']}: {total_words} words")
+        logging.info(f"   FAQs: {len(results['faqs'])}")
+        logging.info(f"   Conclusion: {len(results['conclusion'].split())} words")
+        
+        return results
 
     def _generate_json_content(self, prompt: str, max_tokens: int, temperature: float) -> list:
         """Helper to generate and parse JSON content from ChatZai"""
